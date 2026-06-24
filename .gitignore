@@ -1,25 +1,5 @@
-# Build and output
-output/
+bin/
+obj/
 *.log
-*.tmp
-
-# Credentials and secrets
-*.pfx
-*.pem
-.env
-.env.local
-secrets/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# PowerShell
-*.ps1.lock
+.venv/
+node_modules/

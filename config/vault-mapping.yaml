@@ -1,40 +1,5 @@
-# Recovery Services Vault Mapping Configuration
-version: "1.0"
-
 vaults:
-  - name: "primary-vault"
-    resourceGroup: "backup-rg"
-    subscription: "primary-sub"
-    region: "eastus"
-    redundancy: "GeoRedundant"
-
-  - name: "secondary-vault"
-    resourceGroup: "backup-rg"
-    subscription: "secondary-sub"
-    region: "westus"
-    redundancy: "LocallyRedundant"
-
-mappings:
-  - resourcePattern: "prod-*"
-    vaultName: "primary-vault"
-    backupPolicy: "daily-retention-30"
-
-  - resourcePattern: "dev-*"
-    vaultName: "secondary-vault"
-    backupPolicy: "weekly-retention-7"
-
-  - resourcePattern: "app-*"
-    vaultName: "primary-vault"
-    backupPolicy: "daily-retention-30"
-
-policies:
-  daily-retention-30:
-    frequency: "daily"
-    time: "02:00"
-    retentionDays: 30
-
-  weekly-retention-7:
-    frequency: "weekly"
-    dayOfWeek: "Sunday"
-    time: "03:00"
-    retentionDays: 7
+  - subscription_id: "<your-sub-id>"
+    resource_group: "rg-backup-test"
+    vault_name: "rsv-test-aue-001"
+    default_policy: "DefaultPolicy"

@@ -1,24 +1,29 @@
-# Backup Compliance Agent
+# Backup Compliance Agent (PoC)
 
-Automated backup compliance verification and remediation for Azure resources.
+## Purpose
+Detect and optionally remediate Azure VM backup compliance
+without using Azure Policy.
 
-## Overview
+## Features (v1)
+- Detect VMs without backup
+- Generate remediation plan
+- Apply backup policy (manual approval)
 
-This agent monitors backup compliance across Azure subscriptions and automatically applies remediation actions to ensure all resources meet organizational backup requirements.
+## Usage
 
-## Quick Start
+### Check compliance
+pwsh ./scripts/check-backup.ps1 `
+  -SubscriptionId "<sub-id>" `
+  -ResourceGroupName "<rg>"
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for system design and [scripts/](scripts/) for usage examples.
+### Generate remediation plan
+pwsh ./scripts/generate-plan.ps1 `
+  -SubscriptionId "<sub-id>" `
+  -ResourceGroupName "<rg>"
 
-## Configuration
-
-- [backup-rules.yaml](config/backup-rules.yaml) - Define backup compliance rules
-- [vault-mapping.yaml](config/vault-mapping.yaml) - Map resources to Recovery Services vaults
-
-## Infrastructure
-
-Azure infrastructure is defined in [infra/main.bicep](infra/main.bicep).
-
-## Output
-
-Generated reports and plans are stored in [output/](output/).
+### Apply backup
+pwsh ./scripts/apply-backup.ps1 `
+  -VaultName "<vault>" `
+  -VaultRG "<rg>" `
+  -VmName "<vm>" `
+  -VmRG "<rg>"

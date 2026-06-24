@@ -1,0 +1,46 @@
+name: Backup Compliance Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscriptionId:
+        description: 'Azure Subscription ID'
+        required: true
+      resourceGroupName:
+        description: 'Resource Group'
+        required: true
+
+  schedule:
+    - cron: "0 20 * * *"   # daily run (NZT ~8am)
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ inputs.subscriptionId }}
+
+      - name: Run compliance check
+        shell: pwsh
+        run: |
+          ./scripts/check-backup.ps1 `
+            -SubscriptionId "${{ inputs.subscriptionId }}" `
+            -ResourceGroupName "${{ inputs.resourceGroupName }}"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: output/reports/

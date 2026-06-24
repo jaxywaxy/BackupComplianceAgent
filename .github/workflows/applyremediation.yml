@@ -1,0 +1,43 @@
+name: Apply Backup Remediation
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+
+    if: contains(github.event.head_commit.message, 'Generated backup remediation plan')
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.SUBSCRIPTION_ID }}
+
+      - name: Apply remediation
+        shell: pwsh
+        run: |
+          $plan = Get-Content ./output/plans/remediation.json | ConvertFrom-Json
+
+          foreach ($item in $plan) {
+            ./scripts/apply-backup.ps1 `
+              -VaultName $item.vault `
+              -VaultRG "rg-backup-test" `
+              -VmName $item.vmName `
+              -VmRG "rg-workload-test"
+          }
+
+      - name: Log completion
+        run: echo "Backup remediation applied successfully"

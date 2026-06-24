@@ -1,0 +1,61 @@
+name: Generate Remediation Plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscriptionId:
+        description: 'Azure Subscription ID'
+        required: true
+      resourceGroupName:
+        description: 'Resource Group'
+        required: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ inputs.subscriptionId }}
+
+      - name: Generate remediation plan
+        shell: pwsh
+        run: |
+          ./scripts/generate-plan.ps1 `
+            -SubscriptionId "${{ inputs.subscriptionId }}" `
+            -ResourceGroupName "${{ inputs.resourceGroupName }}"
+
+      - name: Commit plan
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout -b remediation-plan-${{ github.run_id }}
+          git add output/plans/remediation.json
+          git commit -m "Generated backup remediation plan"
+          git push origin HEAD
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: "Backup remediation plan"
+          body: |
+            This PR contains a backup remediation plan.
+
+            ✅ Review required
+            ✅ No changes have been applied yet
+
+            Merge this PR to approve remediation.
+          branch: remediation-plan-${{ github.run_id }}
+          base: main

@@ -1,34 +1,12 @@
-# Backup Compliance Rules Configuration
-version: "1.0"
-
-rules:
-  - name: "Virtual Machines"
-    description: "All VMs must have daily backups"
-    resourceType: "Microsoft.Compute/virtualMachines"
+backup_rules:
+  default:
     required: true
-    backupFrequency: "daily"
-    retentionDays: 30
-    tags:
-      - backupRequired: "true"
+    policy: default
 
-  - name: "SQL Databases"
-    description: "All SQL databases must have backups"
-    resourceType: "Microsoft.Sql/servers/databases"
+  prod:
     required: true
-    backupFrequency: "daily"
-    retentionDays: 14
-    tags:
-      - backupRequired: "true"
+    policy: daily-35d
 
-  - name: "Storage Accounts"
-    description: "Critical storage accounts must have backups"
-    resourceType: "Microsoft.Storage/storageAccounts"
-    required: false
-    backupFrequency: "weekly"
-    retentionDays: 7
-    tags:
-      - criticality: "high"
-
-exclusions:
-  - "test-*"
-  - "*-temporary"
+  nonprod:
+    required: true
+    policy: daily-14d

@@ -17,6 +17,7 @@ if ([string]::IsNullOrWhiteSpace($policyNameToUse)) {
   $policy = az backup policy list `
     --vault-name $VaultName `
     --resource-group $VaultRG `
+    --output json `
     | ConvertFrom-Json | Select-Object -First 1
   if (-not $policy) {
     throw "No backup policy found in vault $VaultName."

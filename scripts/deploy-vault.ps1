@@ -12,7 +12,7 @@ if ([string]::IsNullOrWhiteSpace($SubscriptionId) -or [string]::IsNullOrWhiteSpa
 Write-Host "Deploying Recovery Services Vault: $VaultName in $ResourceGroupName..."
 
 # Ensure resource group exists
-$rg = az group show --name $ResourceGroupName --subscription $SubscriptionId 2>$null
+$rg = az group show --name $ResourceGroupName --subscription $SubscriptionId --output json 2>$null
 if (-not $rg) {
   Write-Host "Creating resource group: $ResourceGroupName in location $Location"
   az group create `
@@ -51,6 +51,7 @@ while ($attempt -lt $maxAttempts) {
     --subscription $SubscriptionId `
     --resource-group $ResourceGroupName `
     --query "[?name=='$VaultName']" `
+    --output json `
     2>$null | ConvertFrom-Json
 
   if ($vault -and $vault.Count -gt 0) {

@@ -14,8 +14,15 @@ function Get-TagValue($vm, $tagName) {
     return $null
   }
 
-  if ($vm.tags.PSObject.Properties.Name -contains $tagName) {
-    return $vm.tags.$tagName
+  # Handle both Hashtable and PSObject
+  if ($vm.tags -is [hashtable]) {
+    if ($vm.tags.ContainsKey($tagName)) {
+      return $vm.tags[$tagName]
+    }
+  } else {
+    if ($vm.tags.PSObject.Properties.Name -contains $tagName) {
+      return $vm.tags.$tagName
+    }
   }
 
   return $null
@@ -57,8 +64,15 @@ function Get-BackupRule($rules, $key) {
     return $null
   }
 
-  if ($rules.PSObject.Properties.Name -contains $key) {
-    return $rules.$key
+  # Handle both Hashtable (from YAML) and PSObject
+  if ($rules -is [hashtable]) {
+    if ($rules.ContainsKey($key)) {
+      return $rules[$key]
+    }
+  } else {
+    if ($rules.PSObject.Properties.Name -contains $key) {
+      return $rules.$key
+    }
   }
 
   return $null
@@ -108,6 +122,7 @@ function Get-VaultPolicy($vault, $policyName) {
       --vault-name $vault.name `
       --resource-group $vault.resourceGroup `
       --name $policyName `
+      --output json `
       2>$null | ConvertFrom-Json
   } catch {
     return $null
@@ -119,6 +134,7 @@ function Get-AnyVaultPolicy($vault) {
     $policies = az backup policy list `
       --vault-name $vault.name `
       --resource-group $vault.resourceGroup `
+      --output json `
       2>$null | ConvertFrom-Json
     if ($policies -and $policies.Count -gt 0) {
       return $policies[0]
@@ -200,7 +216,7 @@ try {
   Write-Host "Unable to load vault mapping config: $_" -ForegroundColor Yellow
 }
 
-$vmsArgs = @("--subscription", $SubscriptionId)
+$vmsArgs = @("--subscription", $SubscriptionId, "--output", "json")
 if (-not [string]::IsNullOrWhiteSpace($ResourceGroupName)) {
   $vmsArgs += @("--resource-group", $ResourceGroupName)
 }
@@ -224,7 +240,7 @@ if (-not $vms) {
   }
 }
 
-$vaults = az backup vault list --subscription $SubscriptionId | ConvertFrom-Json
+$vaults = az backup vault list --subscription $SubscriptionId --output json | ConvertFrom-Json
 if (-not $vaults) {
   Write-Host "No Recovery Services vaults found in subscription $SubscriptionId." -ForegroundColor Yellow
 }
@@ -235,6 +251,7 @@ if ($vaults) {
     $items = az backup item list `
       --vault-name $vault.name `
       --resource-group $vault.resourceGroup `
+      --output json `
       | ConvertFrom-Json
 
     foreach ($item in $items) {

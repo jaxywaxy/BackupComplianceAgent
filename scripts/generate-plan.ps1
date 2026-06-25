@@ -217,14 +217,9 @@ if (-not $vms) {
 }
 
 $vaults = az backup vault list --subscription $SubscriptionId | ConvertFrom-Json
+$planResult.vaultDeployments = @()
 if (-not $vaults) {
   Write-Host "No Recovery Services vaults found in subscription $SubscriptionId." -ForegroundColor Yellow
-  $planResult.notifications += [PSCustomObject]@{
-    level = 'Error'
-    message = 'No Recovery Services vaults found in subscription.'
-    subscriptionId = $SubscriptionId
-    notificationRecipient = $defaultNotificationRecipient
-  }
 }
 
 $protectedVmIds = @{}
@@ -302,33 +297,48 @@ if ($vms) {
       continue
     }
 
-    if (-not $vaults) {
-      Write-Host "$($vm.name) => NO RECOVERY SERVICES VAULT AVAILABLE" -ForegroundColor Yellow
-      $planResult.notifications += [PSCustomObject]@{
-        level = 'Warning'
-        message = 'No Recovery Services vault available for VM.'
-        vmName = $vm.name
-        vmId = $vm.id
-        resourceGroup = $vm.resourceGroup
-        owner = $owner
-        environment = $environment
-        notificationRecipient = $defaultNotificationRecipient
-      }
-      continue
+    $vault = $null
+    if ($vaults) {
+      $vault = Get-PreferredVault $vm $SubscriptionId $vaults
     }
 
-    $vault = Get-PreferredVault $vm $SubscriptionId $vaults
     if (-not $vault) {
-      Write-Host "$($vm.name) => NO RECOVERY SERVICES VAULT AVAILABLE" -ForegroundColor Yellow
-      $planResult.notifications += [PSCustomObject]@{
-        level = 'Warning'
-        message = 'No Recovery Services vault available for VM.'
+      $mapping = Get-VaultMapping $SubscriptionId
+      $mappedVault = if ($mapping) { $mapping | Select-Object -First 1 } else { $null }
+
+      $vaultName = if ($mappedVault) { $mappedVault.vault_name } else { "rsv-backup-$($vm.location.Substring(0,3))-001" }
+      $vaultRG = if ($mappedVault) { $mappedVault.resource_group } else { 'rg-backup-shared' }
+
+      Write-Host "$($vm.name) => VAULT DEPLOYMENT NEEDED ($vaultName in $vaultRG)" -ForegroundColor Cyan
+
+      $deploymentKey = "$vaultName-$vaultRG"
+      $existingDeployment = $planResult.vaultDeployments | Where-Object { $_.deploymentKey -eq $deploymentKey }
+
+      if (-not $existingDeployment) {
+        $planResult.vaultDeployments += [PSCustomObject]@{
+          deploymentKey = $deploymentKey
+          vaultName = $vaultName
+          vaultRG = $vaultRG
+          location = $vm.location
+          vmName = $vm.name
+          subscriptionId = $SubscriptionId
+        }
+      }
+
+      $planResult.plan += [PSCustomObject]@{
         vmName = $vm.name
         vmId = $vm.id
         resourceGroup = $vm.resourceGroup
         owner = $owner
         environment = $environment
+        action = 'EnableBackup'
+        vaultName = $vaultName
+        vaultRG = $vaultRG
+        vaultLocation = $vm.location
+        policyName = $null
+        ownerNotification = "Vault deployment required before backup can be enabled."
         notificationRecipient = $defaultNotificationRecipient
+        decision = $decision
       }
       continue
     }
@@ -407,7 +417,7 @@ if (-not (Test-Path $outputDir)) {
 $jsonPath = "$outputDir/remediation.json"
 $planResult | ConvertTo-Json -Depth 6 | Out-File -Encoding utf8 $jsonPath
 Write-Host "Plan written to $jsonPath"
-Write-Host "Plan items: $($planResult.plan.Count); Notifications: $($planResult.notifications.Count)"
+Write-Host "Vault deployments: $($planResult.vaultDeployments.Count); Plan items: $($planResult.plan.Count); Notifications: $($planResult.notifications.Count)"
 
 $markdownPath = "$outputDir/remediation.md"
 $md = @()
@@ -416,9 +426,25 @@ $md += ""
 $md += "Generated: $(Get-Date -Format 'u')"
 $md += ""
 $md += "## Summary"
+$md += "- Vault deployments required: $($planResult.vaultDeployments.Count)"
 $md += "- Total plan items: $($planResult.plan.Count)"
 $md += "- Total notifications: $($planResult.notifications.Count)"
 $md += ""
+
+if ($planResult.vaultDeployments.Count -gt 0) {
+  $md += "## Vault Deployments Required"
+  foreach ($deployment in $planResult.vaultDeployments | Select-Object -First 20) {
+    $md += "- **Vault:** $($deployment.vaultName)"
+    $md += "  - Resource Group: $($deployment.vaultRG)"
+    $md += "  - Location: $($deployment.location)"
+    $md += "  - Triggered by VM: $($deployment.vmName)"
+    $md += ""
+  }
+  if ($planResult.vaultDeployments.Count -gt 20) {
+    $md += "- And $($planResult.vaultDeployments.Count - 20) more vault deployments..."
+    $md += ""
+  }
+}
 
 if ($planResult.plan.Count -gt 0) {
   $md += "## Remediation Items"

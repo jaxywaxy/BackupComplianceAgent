@@ -26,17 +26,43 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.SUBSCRIPTION_ID }}
 
-      - name: Apply remediation
+      - name: Deploy missing vaults
         shell: pwsh
         run: |
           $plan = Get-Content ./output/plans/remediation.json | ConvertFrom-Json
 
-          foreach ($item in $plan) {
-            ./scripts/apply-backup.ps1 `
-              -VaultName $item.vault `
-              -VaultRG "rg-backup-test" `
-              -VmName $item.vmName `
-              -VmRG "rg-workload-test"
+          if ($plan.vaultDeployments -and $plan.vaultDeployments.Count -gt 0) {
+            Write-Host "Deploying $($plan.vaultDeployments.Count) vault(s)..."
+            foreach ($deployment in $plan.vaultDeployments) {
+              Write-Host "Deploying vault: $($deployment.vaultName) in $($deployment.vaultRG)"
+              ./scripts/deploy-vault.ps1 `
+                -SubscriptionId "${{ vars.SUBSCRIPTION_ID }}" `
+                -ResourceGroupName $deployment.vaultRG `
+                -VaultName $deployment.vaultName `
+                -Location $deployment.location
+            }
+          } else {
+            Write-Host "No vault deployments required."
+          }
+
+      - name: Enable backups for VMs
+        shell: pwsh
+        run: |
+          $plan = Get-Content ./output/plans/remediation.json | ConvertFrom-Json
+
+          if ($plan.plan -and $plan.plan.Count -gt 0) {
+            Write-Host "Enabling backups for $($plan.plan.Count) VM(s)..."
+            foreach ($item in $plan.plan) {
+              Write-Host "Enabling backup for $($item.vmName)..."
+              ./scripts/apply-backup.ps1 `
+                -VaultName $item.vaultName `
+                -VaultRG $item.vaultRG `
+                -VmName $item.vmName `
+                -VmRG $item.resourceGroup `
+                -PolicyName $item.policyName
+            }
+          } else {
+            Write-Host "No backup enablement items in plan."
           }
 
       - name: Log completion

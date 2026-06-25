@@ -1,0 +1,17 @@
+vault_deployment:
+  shared_resource_group: 'rg-backup-shared'
+
+  vaults:
+    - name_template: 'rsv-backup-{region}-001'
+      regions:
+        - australiaeast
+        - australiasoutheast
+        - westus
+        - eastus
+      sku: 'Standard'
+      soft_delete_enabled: true
+
+deployment_policy:
+  auto_deploy: true
+  default_location: 'australiaeast'
+  naming_convention: 'rsv-backup-{region}-001'

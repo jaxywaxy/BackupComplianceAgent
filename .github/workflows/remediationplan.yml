@@ -47,16 +47,19 @@ jobs:
           }
 
           $data = Get-Content $planFile -Raw | ConvertFrom-Json
+          $vaultDeploymentCount = if ($data.vaultDeployments) { $data.vaultDeployments.Count } else { 0 }
           $planCount = if ($data.plan) { $data.plan.Count } else { 0 }
           $notificationCount = if ($data.notifications) { $data.notifications.Count } else { 0 }
 
+          Write-Host "Vault deployments: $vaultDeploymentCount"
           Write-Host "Plan items: $planCount"
           Write-Host "Notifications: $notificationCount"
 
+          echo "vaultDeploymentCount=$vaultDeploymentCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
           echo "planCount=$planCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
           echo "notificationCount=$notificationCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
 
-          if ($planCount -eq 0) {
+          if ($planCount -eq 0 -and $vaultDeploymentCount -eq 0) {
             Write-Host "No actionable remediation items were generated. Skipping PR creation."
             exit 0
           }
@@ -107,6 +110,7 @@ jobs:
           }
 
           $plan = Get-Content $planFile -Raw | ConvertFrom-Json
+          $vaultDeploymentCount = if ($plan.vaultDeployments) { $plan.vaultDeployments.Count } else { 0 }
           $planCount = if ($plan.plan) { $plan.plan.Count } else { 0 }
           $notificationCount = if ($plan.notifications) { $plan.notifications.Count } else { 0 }
           $planOwners = if ($plan.plan) { ($plan.plan | Where-Object { $_.owner } | Select-Object -ExpandProperty owner) } else { @() }
@@ -126,6 +130,7 @@ jobs:
           $summary += '# Backup Remediation Plan'
           $summary += ''
           $summary += '## Summary'
+          $summary += "- Vault deployments required: $vaultDeploymentCount"
           $summary += "- Plan items: $planCount"
           $summary += "- Notifications: $notificationCount"
           $summary += "- Owner values for actionable remediation: $planOwnersText"

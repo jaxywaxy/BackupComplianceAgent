@@ -109,9 +109,16 @@ jobs:
           $plan = Get-Content $planFile -Raw | ConvertFrom-Json
           $planCount = if ($plan.plan) { $plan.plan.Count } else { 0 }
           $notificationCount = if ($plan.notifications) { $plan.notifications.Count } else { 0 }
-          $ownerNotificationCount = if ($plan.plan) { ($plan.plan | Where-Object { $_.owner -and $_.action -eq 'EnableBackup' }).Count } else { 0 }
-          $ownerValues = if ($plan.plan) { ($plan.plan | Where-Object { $_.owner -and $_.action -eq 'EnableBackup' } | Select-Object -ExpandProperty owner | Sort-Object -Unique) } else { @() }
-          $ownersText = if ($ownerValues.Count -gt 0) { $ownerValues -join ', ' } else { 'None' }
+          $planOwners = if ($plan.plan) { ($plan.plan | Where-Object { $_.owner } | Select-Object -ExpandProperty owner) } else { @() }
+          $notificationOwners = if ($plan.notifications) { ($plan.notifications | Where-Object { $_.owner } | Select-Object -ExpandProperty owner) } else { @() }
+          $planOwnerValues = ($planOwners | Sort-Object -Unique) | Where-Object { $_ }
+          $notificationOwnerValues = ($notificationOwners | Sort-Object -Unique) | Where-Object { $_ }
+          $notificationOnlyOwnerValues = @()
+          if ($notificationOwnerValues.Count -gt 0) {
+            $notificationOnlyOwnerValues = $notificationOwnerValues | Where-Object { $planOwnerValues -notcontains $_ }
+          }
+          $planOwnersText = if ($planOwnerValues.Count -gt 0) { $planOwnerValues -join ', ' } else { 'None' }
+          $notificationOnlyOwnersText = if ($notificationOnlyOwnerValues.Count -gt 0) { $notificationOnlyOwnerValues -join ', ' } else { 'None' }
           $prUrl = '${{ steps.create_pr.outputs.pull-request-url }}'
           $prStatus = if ($prUrl) { "PR created: $prUrl" } else { 'No PR was created.' }
 
@@ -121,8 +128,8 @@ jobs:
           $summary += '## Summary'
           $summary += "- Plan items: $planCount"
           $summary += "- Notifications: $notificationCount"
-          $summary += "- Owner notification count: $ownerNotificationCount"
-          $summary += "- Owner values: $ownersText"
+          $summary += "- Owner values for actionable remediation: $planOwnersText"
+          $summary += "- Owner values for notification-only VMs: $notificationOnlyOwnersText"
           $summary += "- $prStatus"
           $summary += ''
 

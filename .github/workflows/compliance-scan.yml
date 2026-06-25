@@ -39,6 +39,63 @@ jobs:
             -SubscriptionId "${{ inputs.subscriptionId }}" `
             -ResourceGroupName "${{ inputs.resourceGroupName }}"
 
+      - name: Publish scan summary to GitHub
+        if: always()
+        shell: pwsh
+        run: |
+          $reportFile = './output/reports/compliance.json'
+          if (-not (Test-Path $reportFile)) {
+            Write-Host "No compliance report file found at $reportFile."
+            exit 0
+          }
+
+          $report = Get-Content $reportFile -Raw | ConvertFrom-Json
+          $totalVms = if ($report.results) { $report.results.Count } else { 0 }
+          $compliantVms = if ($report.results) { ($report.results | Where-Object { $_.compliant -eq $true }).Count } else { 0 }
+          $nonCompliantVms = $totalVms - $compliantVms
+          $notifications = if ($report.notifications) { $report.notifications.Count } else { 0 }
+
+          $summary = @()
+          $summary += '# Backup Compliance Scan Results'
+          $summary += ''
+          $summary += '## Summary'
+          $summary += "* Subscription: ${{ inputs.subscriptionId }}"
+          if ('${{ inputs.resourceGroupName }}' -ne '') { $summary += "* Resource Group: ${{ inputs.resourceGroupName }}" }
+          $summary += "* Total VMs checked: $totalVms"
+          $summary += "* Compliant VMs: $compliantVms"
+          $summary += "* Non-compliant VMs: $nonCompliantVms"
+          $summary += "* Notifications: $notifications"
+          $summary += ''
+
+          if ($notifications -gt 0) {
+            $summary += '## Notifications'
+            foreach ($notification in $report.notifications | Select-Object -First 10) {
+              $summary += "* **$($notification.level)**: $($notification.message)"
+            }
+            if ($report.notifications.Count -gt 10) {
+              $summary += "*And $($report.notifications.Count - 10) more notifications..."
+            }
+            $summary += ''
+          }
+
+          if ($nonCompliantVms -gt 0) {
+            $summary += '## Non-compliant VMs'
+            foreach ($vm in $report.results | Where-Object { $_.compliant -ne $true } | Select-Object -First 10) {
+              $summary += "* $($vm.vmName) ($($vm.resourceGroup)) — decision: $($vm.decision)"
+            }
+            if (($report.results | Where-Object { $_.compliant -ne $true }).Count -gt 10) {
+              $summary += "*And $((($report.results | Where-Object { $_.compliant -ne $true }).Count) - 10) more VMs..."
+            }
+            $summary += ''
+          }
+
+          $summaryFile = $env:GITHUB_STEP_SUMMARY
+          if (-not $summaryFile) {
+            Write-Host $summary -Separator "`n"
+          } else {
+            $summary -join "`n" | Out-File -Encoding utf8 -FilePath $summaryFile
+          }
+
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:

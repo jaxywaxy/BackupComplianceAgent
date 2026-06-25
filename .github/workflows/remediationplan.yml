@@ -23,6 +23,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install PowerShell dependencies
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -Name powershell-yaml -ListAvailable)) {
+            Install-Module -Name powershell-yaml -Force -Scope CurrentUser
+          }
+
       - name: Azure Login
         uses: azure/login@v2
         with:

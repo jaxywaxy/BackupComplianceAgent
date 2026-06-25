@@ -178,6 +178,13 @@ function Evaluate-Environment($environment) {
 
 Write-Host "Generating remediation plan..."
 
+if (-not (Get-Module -Name powershell-yaml -ListAvailable)) {
+  Write-Host "Installing powershell-yaml module..."
+  Install-Module -Name powershell-yaml -Force -Scope CurrentUser
+}
+
+Import-Module powershell-yaml -Force
+
 $backupRules = $null
 $vaultMappings = $null
 try {
@@ -201,6 +208,7 @@ if (-not [string]::IsNullOrWhiteSpace($ResourceGroupName)) {
 $vms = az vm list @vmsArgs | ConvertFrom-Json
 
 $planResult = [PSCustomObject]@{
+  vaultDeployments = @()
   plan = @()
   notifications = @()
 }
@@ -217,7 +225,6 @@ if (-not $vms) {
 }
 
 $vaults = az backup vault list --subscription $SubscriptionId | ConvertFrom-Json
-$planResult.vaultDeployments = @()
 if (-not $vaults) {
   Write-Host "No Recovery Services vaults found in subscription $SubscriptionId." -ForegroundColor Yellow
 }

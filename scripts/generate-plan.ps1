@@ -8,9 +8,14 @@ if ([string]::IsNullOrWhiteSpace($SubscriptionId)) {
 }
 
 function Get-TagValue($vm, $tagName) {
-  if ($vm.tags -and $vm.tags.ContainsKey($tagName)) {
-    return $vm.tags[$tagName]
+  if (-not $vm.tags) {
+    return $null
   }
+
+  if ($vm.tags.PSObject.Properties.Name -contains $tagName) {
+    return $vm.tags.$tagName
+  }
+
   return $null
 }
 

@@ -146,8 +146,19 @@ function Get-AnyVaultPolicy($vault) {
 
 function Get-PolicyName($normalizedEnvironment, $vault) {
   $rule = Get-BackupRuleOrDefault $backupRules $normalizedEnvironment
-  if ($rule -and $rule.policy -and $rule.policy -ne 'default') {
-    return $rule.policy
+
+  # Extract policy name from rule (handle both Hashtable and PSObject)
+  $policyName = $null
+  if ($rule) {
+    if ($rule -is [hashtable]) {
+      $policyName = $rule['policy']
+    } else {
+      $policyName = $rule.policy
+    }
+  }
+
+  if ($rule -and $policyName -and $policyName -ne 'default') {
+    return $policyName
   }
 
   $mapping = Get-VaultMapping $SubscriptionId | Where-Object {
@@ -158,7 +169,7 @@ function Get-PolicyName($normalizedEnvironment, $vault) {
     return $mapping.default_policy
   }
 
-  if ($rule -and $rule.policy -eq 'default') {
+  if ($rule -and $policyName -eq 'default') {
     $candidatePolicyName = 'DefaultPolicy'
     if (Get-VaultPolicy $vault $candidatePolicyName) {
       return $candidatePolicyName
@@ -185,7 +196,15 @@ function Evaluate-Environment($environment) {
     return 'Review'
   }
 
-  if ($rule.required -eq $true) {
+  # Handle both Hashtable and PSObject
+  $required = $false
+  if ($rule -is [hashtable]) {
+    $required = $rule['required'] -eq $true
+  } else {
+    $required = $rule.required -eq $true
+  }
+
+  if ($required) {
     return 'EnableBackup'
   }
 

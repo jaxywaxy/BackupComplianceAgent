@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'output/plans/remediation.json'
+  workflow_dispatch:
 
 jobs:
   apply:
     runs-on: ubuntu-latest
-
-    if: contains(github.event.head_commit.message, 'Generated backup remediation plan')
 
     permissions:
       id-token: write
@@ -33,10 +34,27 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.SUBSCRIPTION_ID }}
 
+      - name: Check for remediation plan
+        shell: pwsh
+        run: |
+          $planFile = './output/plans/remediation.json'
+          if (-not (Test-Path $planFile)) {
+            Write-Host "⚠️  No remediation plan found at $planFile"
+            Write-Host "Please run the 'Generate Remediation Plan' workflow first."
+            exit 1
+          }
+          Write-Host "✓ Remediation plan found"
+
       - name: Deploy missing vaults
         shell: pwsh
         run: |
-          $plan = Get-Content ./output/plans/remediation.json | ConvertFrom-Json
+          $planFile = './output/plans/remediation.json'
+          if (-not (Test-Path $planFile)) {
+            Write-Host "Remediation plan file not found"
+            exit 0
+          }
+
+          $plan = Get-Content $planFile | ConvertFrom-Json
 
           if ($plan.vaultDeployments -and $plan.vaultDeployments.Count -gt 0) {
             Write-Host "Deploying $($plan.vaultDeployments.Count) vault(s)..."
@@ -47,30 +65,91 @@ jobs:
                 -ResourceGroupName $deployment.vaultRG `
                 -VaultName $deployment.vaultName `
                 -Location $deployment.location
+
+              if ($LASTEXITCODE -ne 0) {
+                throw "Failed to deploy vault $($deployment.vaultName)"
+              }
             }
+            Write-Host "✓ All vaults deployed successfully"
           } else {
-            Write-Host "No vault deployments required."
+            Write-Host "ℹ️  No vault deployments required"
           }
 
       - name: Enable backups for VMs
         shell: pwsh
         run: |
-          $plan = Get-Content ./output/plans/remediation.json | ConvertFrom-Json
+          $planFile = './output/plans/remediation.json'
+          if (-not (Test-Path $planFile)) {
+            Write-Host "Remediation plan file not found"
+            exit 0
+          }
+
+          $plan = Get-Content $planFile | ConvertFrom-Json
 
           if ($plan.plan -and $plan.plan.Count -gt 0) {
             Write-Host "Enabling backups for $($plan.plan.Count) VM(s)..."
+            $successCount = 0
+            $failureCount = 0
+
             foreach ($item in $plan.plan) {
+              Write-Host ""
               Write-Host "Enabling backup for $($item.vmName)..."
-              ./scripts/apply-backup.ps1 `
-                -VaultName $item.vaultName `
-                -VaultRG $item.vaultRG `
-                -VmName $item.vmName `
-                -VmRG $item.resourceGroup `
-                -PolicyName $item.policyName
+              try {
+                ./scripts/apply-backup.ps1 `
+                  -VaultName $item.vaultName `
+                  -VaultRG $item.vaultRG `
+                  -VmName $item.vmName `
+                  -VmRG $item.resourceGroup `
+                  -PolicyName $item.policyName
+
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "✓ Backup enabled for $($item.vmName)" -ForegroundColor Green
+                  $successCount++
+                } else {
+                  Write-Host "✗ Failed to enable backup for $($item.vmName)" -ForegroundColor Red
+                  $failureCount++
+                }
+              } catch {
+                Write-Host "✗ Error enabling backup for $($item.vmName): $_" -ForegroundColor Red
+                $failureCount++
+              }
+            }
+
+            Write-Host ""
+            Write-Host "Summary:" -ForegroundColor Cyan
+            Write-Host "  ✓ Successful: $successCount"
+            Write-Host "  ✗ Failed: $failureCount"
+
+            if ($failureCount -gt 0) {
+              throw "Failed to enable backup on $failureCount VM(s)"
             }
           } else {
-            Write-Host "No backup enablement items in plan."
+            Write-Host "ℹ️  No backup enablement items in plan"
+          }
+
+      - name: Publish summary
+        if: always()
+        shell: pwsh
+        run: |
+          $planFile = './output/plans/remediation.json'
+          if (Test-Path $planFile) {
+            $plan = Get-Content $planFile | ConvertFrom-Json
+            $vaultCount = if ($plan.vaultDeployments) { $plan.vaultDeployments.Count } else { 0 }
+            $vmCount = if ($plan.plan) { $plan.plan.Count } else { 0 }
+
+            $summary = @()
+            $summary += "# Backup Remediation Applied"
+            $summary += ""
+            $summary += "## Summary"
+            $summary += "- Vaults deployed: $vaultCount"
+            $summary += "- VMs backed up: $vmCount"
+            $summary += ""
+
+            $summaryFile = $env:GITHUB_STEP_SUMMARY
+            if ($summaryFile) {
+              $summary -join "`n" | Out-File -Encoding utf8 -FilePath $summaryFile -Append
+            }
           }
 
       - name: Log completion
-        run: echo "Backup remediation applied successfully"
+        run: echo "✓ Backup remediation applied successfully"

@@ -37,14 +37,41 @@ jobs:
             -SubscriptionId "${{ inputs.subscriptionId }}" `
             -ResourceGroupName "${{ inputs.resourceGroupName }}"
 
+      - name: Check remediation plan
+        shell: pwsh
+        run: |
+          $planFile = './output/plans/remediation.json'
+          if (-not (Test-Path $planFile)) {
+            throw "Remediation plan file not found: $planFile"
+          }
+
+          $data = Get-Content $planFile -Raw | ConvertFrom-Json
+          $planCount = if ($data.plan) { $data.plan.Count } else { 0 }
+          $notificationCount = if ($data.notifications) { $data.notifications.Count } else { 0 }
+
+          Write-Host "Plan items: $planCount"
+          Write-Host "Notifications: $notificationCount"
+
+          if ($planCount -eq 0 -and $notificationCount -eq 0) {
+            Write-Host "No remediation items and no notifications were generated. Skipping PR creation."
+            exit 0
+          }
+
       - name: Commit plan
+        shell: pwsh
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git checkout -b remediation-plan-${{ github.run_id }}
           git add output/plans/remediation.json
           git commit -m "Generated backup remediation plan"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Commit failed: no remediation plan changes were staged."
+          }
           git push origin HEAD
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to push remediation plan branch to origin."
+          }
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v6

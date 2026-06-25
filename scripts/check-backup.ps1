@@ -19,28 +19,86 @@ function Get-TagValue($vm, $tagName) {
   return $null
 }
 
-function Evaluate-Environment($environment) {
+function Load-YamlConfig($path) {
+  if (-not (Test-Path $path)) {
+    throw "Configuration file not found: $path"
+  }
+
+  $content = Get-Content -Raw -Path $path
+  return $content | ConvertFrom-Yaml
+}
+
+function Normalize-Environment($environment) {
   if (-not $environment) {
-    return "Review"
+    return $null
   }
 
   switch ($environment.ToLower()) {
-    'prod' { return 'EnableBackup' }
-    'production' { return 'EnableBackup' }
-    'stage' { return 'EnableBackup' }
-    'staging' { return 'EnableBackup' }
-    'uat' { return 'EnableBackup' }
-    'preprod' { return 'EnableBackup' }
-    'qa' { return 'EnableBackup' }
-    'dev' { return 'EnableBackup' }
-    'development' { return 'EnableBackup' }
-    'test' { return 'EnableBackup' }
-    'sandbox' { return 'EnableBackup' }
-    default { return 'Review' }
+    'prod' { return 'prod' }
+    'production' { return 'prod' }
+    'nonprod' { return 'nonprod' }
+    'stage' { return 'nonprod' }
+    'staging' { return 'nonprod' }
+    'uat' { return 'nonprod' }
+    'preprod' { return 'nonprod' }
+    'qa' { return 'nonprod' }
+    'dev' { return 'nonprod' }
+    'development' { return 'nonprod' }
+    'test' { return 'nonprod' }
+    'sandbox' { return 'nonprod' }
+    default { return $environment.ToLower() }
   }
 }
 
+function Get-BackupRule($rules, $key) {
+  if (-not $rules) {
+    return $null
+  }
+
+  if ($rules.PSObject.Properties.Name -contains $key) {
+    return $rules.$key
+  }
+
+  return $null
+}
+
+function Get-BackupRuleOrDefault($rules, $key) {
+  $rule = Get-BackupRule $rules $key
+  if ($rule) {
+    return $rule
+  }
+
+  return Get-BackupRule $rules 'default'
+}
+
+function Evaluate-Environment($environment, $backupRules) {
+  if (-not $environment) {
+    return 'Review'
+  }
+
+  $normalized = Normalize-Environment $environment
+  $rule = Get-BackupRuleOrDefault $backupRules $normalized
+
+  if (-not $rule) {
+    return 'Review'
+  }
+
+  if ($rule.required -eq $true) {
+    return 'EnableBackup'
+  }
+
+  return 'Review'
+}
+
 Write-Host "Checking backup compliance..."
+
+$backupRules = $null
+try {
+  $config = Load-YamlConfig './config/backup-rules.yaml'
+  $backupRules = $config.backup_rules
+} catch {
+  Write-Host "Unable to load backup rules config: $_" -ForegroundColor Yellow
+}
 
 $vmsArgs = @("--subscription", $SubscriptionId)
 if (-not [string]::IsNullOrWhiteSpace($ResourceGroupName)) {
@@ -99,6 +157,7 @@ if ($vms) {
     $backupEnabled = $protectedVmIds.ContainsKey($vmId)
     $decision = $null
     $reason = $null
+    $ruleLabel = $null
 
     if ($backupEnabled) {
       $decision = 'Compliant'
@@ -117,14 +176,17 @@ if ($vms) {
         Write-Host "$($vm.name) => MISSING ENVIRONMENT TAG" -ForegroundColor Yellow
       }
       else {
-        $decision = Evaluate-Environment $environment
+        $decision = Evaluate-Environment $environment $backupRules
+        $ruleLabel = Normalize-Environment $environment
+
         if ($decision -eq 'EnableBackup') {
           Write-Host "$($vm.name) => NON-COMPLIANT, remediation required" -ForegroundColor Red
+          $reason = "Backup required for environment '$environment' (rule: $ruleLabel). Notify owner '$owner'."
         }
         else {
           Write-Host "$($vm.name) => REVIEW REQUIRED for environment '$environment'" -ForegroundColor Yellow
+          $reason = "Review required for environment '$environment' (rule: $ruleLabel)."
         }
-        $reason = "Decision=$decision; environment=$environment"
       }
     }
 
@@ -137,6 +199,7 @@ if ($vms) {
       environment = $environment
       backupEnabled = $backupEnabled
       decision = $decision
+      rule = $ruleLabel
       reason = $reason
       compliant = ($backupEnabled -eq $true)
     }
@@ -151,6 +214,7 @@ if ($vms) {
         owner = $owner
         environment = $environment
         decision = $decision
+        ownerNotification = if ($decision -eq 'EnableBackup') { "Notify owner '$owner' about backup enablement." } else { $null }
       }
       $report.notifications += $notification
     }

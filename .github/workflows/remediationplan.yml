@@ -38,6 +38,7 @@ jobs:
             -ResourceGroupName "${{ inputs.resourceGroupName }}"
 
       - name: Check remediation plan
+        id: check_plan
         shell: pwsh
         run: |
           $planFile = './output/plans/remediation.json'
@@ -52,18 +53,23 @@ jobs:
           Write-Host "Plan items: $planCount"
           Write-Host "Notifications: $notificationCount"
 
-          if ($planCount -eq 0 -and $notificationCount -eq 0) {
-            Write-Host "No remediation items and no notifications were generated. Skipping PR creation."
+          echo "planCount=$planCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
+          echo "notificationCount=$notificationCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
+
+          if ($planCount -eq 0) {
+            Write-Host "No actionable remediation items were generated. Skipping PR creation."
             exit 0
           }
 
       - name: Commit plan
+        if: steps.check_plan.outputs.planCount != '0'
+        id: commit_plan
         shell: pwsh
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git checkout -b remediation-plan-${{ github.run_id }}
-          git add output/plans/remediation.json
+          git add output/plans/remediation.json output/plans/remediation.md
           git commit -m "Generated backup remediation plan"
           if ($LASTEXITCODE -ne 0) {
             throw "Commit failed: no remediation plan changes were staged."
@@ -74,6 +80,8 @@ jobs:
           }
 
       - name: Create PR
+        if: steps.commit_plan.outcome == 'success'
+        id: create_pr
         uses: peter-evans/create-pull-request@v6
         with:
           title: "Backup remediation plan"
@@ -86,3 +94,47 @@ jobs:
             Merge this PR to approve remediation.
           branch: remediation-plan-${{ github.run_id }}
           base: main
+
+      - name: Publish remediation plan summary to GitHub
+        if: always()
+        shell: pwsh
+        run: |
+          $planFile = './output/plans/remediation.json'
+          $mdFile = './output/plans/remediation.md'
+          if (-not (Test-Path $planFile)) {
+            Write-Host "No remediation plan file found at $planFile."
+            exit 0
+          }
+
+          $plan = Get-Content $planFile -Raw | ConvertFrom-Json
+          $planCount = if ($plan.plan) { $plan.plan.Count } else { 0 }
+          $notificationCount = if ($plan.notifications) { $plan.notifications.Count } else { 0 }
+          $ownerNotificationCount = if ($plan.plan) { ($plan.plan | Where-Object { $_.owner -and $_.action -eq 'EnableBackup' }).Count } else { 0 }
+          $ownerValues = if ($plan.plan) { ($plan.plan | Where-Object { $_.owner -and $_.action -eq 'EnableBackup' } | Select-Object -ExpandProperty owner | Sort-Object -Unique) } else { @() }
+          $ownersText = if ($ownerValues.Count -gt 0) { $ownerValues -join ', ' } else { 'None' }
+          $prUrl = '${{ steps.create_pr.outputs.pull-request-url }}'
+          $prStatus = if ($prUrl) { "PR created: $prUrl" } else { 'No PR was created.' }
+
+          $summary = @()
+          $summary += '# Backup Remediation Plan'
+          $summary += ''
+          $summary += '## Summary'
+          $summary += "- Plan items: $planCount"
+          $summary += "- Notifications: $notificationCount"
+          $summary += "- Owner notification count: $ownerNotificationCount"
+          $summary += "- Owner values: $ownersText"
+          $summary += "- $prStatus"
+          $summary += ''
+
+          if (Test-Path $mdFile) {
+            $summary += '## Markdown plan'
+            $summary += "Generated file: $mdFile"
+            $summary += ''
+          }
+
+          $summaryFile = $env:GITHUB_STEP_SUMMARY
+          if (-not $summaryFile) {
+            Write-Host $summary -Separator "`n"
+          } else {
+            $summary -join "`n" | Out-File -Encoding utf8 -FilePath $summaryFile
+          }

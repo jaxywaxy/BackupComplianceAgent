@@ -19,27 +19,139 @@ function Get-TagValue($vm, $tagName) {
   return $null
 }
 
+function Load-YamlConfig($path) {
+  if (-not (Test-Path $path)) {
+    throw "Configuration file not found: $path"
+  }
+
+  $content = Get-Content -Raw -Path $path
+  return $content | ConvertFrom-Yaml
+}
+
+function Normalize-Environment($environment) {
+  if (-not $environment) {
+    return $null
+  }
+
+  switch ($environment.ToLower()) {
+    'prod' { return 'prod' }
+    'production' { return 'prod' }
+    'nonprod' { return 'nonprod' }
+    'stage' { return 'nonprod' }
+    'staging' { return 'nonprod' }
+    'uat' { return 'nonprod' }
+    'preprod' { return 'nonprod' }
+    'qa' { return 'nonprod' }
+    'dev' { return 'nonprod' }
+    'development' { return 'nonprod' }
+    'test' { return 'nonprod' }
+    'sandbox' { return 'nonprod' }
+    default { return $environment.ToLower() }
+  }
+}
+
+function Get-BackupRule($rules, $key) {
+  if (-not $rules) {
+    return $null
+  }
+
+  if ($rules.PSObject.Properties.Name -contains $key) {
+    return $rules.$key
+  }
+
+  return $null
+}
+
+function Get-BackupRuleOrDefault($rules, $key) {
+  $rule = Get-BackupRule $rules $key
+  if ($rule) {
+    return $rule
+  }
+
+  return Get-BackupRule $rules 'default'
+}
+
+function Get-VaultMapping($subscriptionId) {
+  if (-not $vaultMappings) {
+    return @()
+  }
+
+  return $vaultMappings.vaults | Where-Object { $_.subscription_id -eq $subscriptionId }
+}
+
+function Get-PreferredVault($vm, $subscriptionId, $vaults) {
+  $mapping = Get-VaultMapping $subscriptionId
+  if ($mapping) {
+    foreach ($entry in $mapping) {
+      $candidate = $vaults | Where-Object {
+        $_.name -eq $entry.vault_name -and $_.resourceGroup -eq $entry.resource_group
+      } | Select-Object -First 1
+      if ($candidate) {
+        return $candidate
+      }
+    }
+  }
+
+  $preferred = $vaults | Where-Object { $_.location -eq $vm.location } | Select-Object -First 1
+  if (-not $preferred) {
+    $preferred = $vaults | Select-Object -First 1
+  }
+
+  return $preferred
+}
+
+function Get-PolicyName($normalizedEnvironment, $vault) {
+  $rule = Get-BackupRuleOrDefault $backupRules $normalizedEnvironment
+  if ($rule -and $rule.policy -and $rule.policy -ne 'default') {
+    return $rule.policy
+  }
+
+  $mapping = Get-VaultMapping $SubscriptionId | Where-Object {
+    $_.vault_name -eq $vault.name -and $_.resource_group -eq $vault.resourceGroup
+  } | Select-Object -First 1
+
+  if ($mapping -and $mapping.default_policy) {
+    return $mapping.default_policy
+  }
+
+  return $null
+}
+
 function Evaluate-Environment($environment) {
   if (-not $environment) {
     return 'Review'
   }
-  switch ($environment.ToLower()) {
-    'prod' { return 'EnableBackup' }
-    'production' { return 'EnableBackup' }
-    'stage' { return 'EnableBackup' }
-    'staging' { return 'EnableBackup' }
-    'uat' { return 'EnableBackup' }
-    'preprod' { return 'EnableBackup' }
-    'qa' { return 'EnableBackup' }
-    'dev' { return 'EnableBackup' }
-    'development' { return 'EnableBackup' }
-    'test' { return 'EnableBackup' }
-    'sandbox' { return 'EnableBackup' }
-    default { return 'Review' }
+
+  $normalized = Normalize-Environment $environment
+  $rule = Get-BackupRuleOrDefault $backupRules $normalized
+
+  if (-not $rule) {
+    return 'Review'
   }
+
+  if ($rule.required -eq $true) {
+    return 'EnableBackup'
+  }
+
+  return 'Review'
 }
 
 Write-Host "Generating remediation plan..."
+
+$backupRules = $null
+$vaultMappings = $null
+try {
+  $config = Load-YamlConfig './config/backup-rules.yaml'
+  $backupRules = $config.backup_rules
+} catch {
+  Write-Host "Unable to load backup rules config: $_" -ForegroundColor Yellow
+}
+
+try {
+  $vaultMappings = Load-YamlConfig './config/vault-mapping.yaml'
+} catch {
+  Write-Host "Unable to load vault mapping config: $_" -ForegroundColor Yellow
+}
 
 $vmsArgs = @("--subscription", $SubscriptionId)
 if (-not [string]::IsNullOrWhiteSpace($ResourceGroupName)) {
@@ -90,14 +202,6 @@ if ($vaults) {
   }
 }
 
-function Get-PreferredVault($vm) {
-  $preferred = $vaults | Where-Object { $_.location -eq $vm.location } | Select-Object -First 1
-  if (-not $preferred) {
-    $preferred = $vaults | Select-Object -First 1
-  }
-  return $preferred
-}
-
 if ($vms) {
   foreach ($vm in $vms) {
     $owner = Get-TagValue $vm 'owner'
@@ -136,6 +240,8 @@ if ($vms) {
     }
 
     $decision = Evaluate-Environment $environment
+    $normalizedEnvironment = Normalize-Environment $environment
+
     if ($decision -ne 'EnableBackup') {
       Write-Host "$($vm.name) => REVIEW REQUIRED for environment '$environment'" -ForegroundColor Yellow
       $planResult.notifications += [PSCustomObject]@{
@@ -151,7 +257,21 @@ if ($vms) {
       continue
     }
 
-    $vault = Get-PreferredVault $vm
+    if (-not $vaults) {
+      Write-Host "$($vm.name) => NO RECOVERY SERVICES VAULT AVAILABLE" -ForegroundColor Yellow
+      $planResult.notifications += [PSCustomObject]@{
+        level = 'Warning'
+        message = 'No Recovery Services vault available for VM.'
+        vmName = $vm.name
+        vmId = $vm.id
+        resourceGroup = $vm.resourceGroup
+        owner = $owner
+        environment = $environment
+      }
+      continue
+    }
+
+    $vault = Get-PreferredVault $vm $SubscriptionId $vaults
     if (-not $vault) {
       Write-Host "$($vm.name) => NO RECOVERY SERVICES VAULT AVAILABLE" -ForegroundColor Yellow
       $planResult.notifications += [PSCustomObject]@{
@@ -166,16 +286,12 @@ if ($vms) {
       continue
     }
 
-    $policy = az backup policy list `
-      --vault-name $vault.name `
-      --resource-group $vault.resourceGroup `
-      | ConvertFrom-Json | Select-Object -First 1
-
-    if (-not $policy) {
-      Write-Host "$($vm.name) => NO BACKUP POLICY IN VAULT $($vault.name)" -ForegroundColor Yellow
+    $policyName = Get-PolicyName $normalizedEnvironment $vault
+    if (-not $policyName) {
+      Write-Host "$($vm.name) => NO BACKUP POLICY FOUND FOR VAULT $($vault.name)" -ForegroundColor Yellow
       $planResult.notifications += [PSCustomObject]@{
         level = 'Warning'
-        message = 'No backup policy found in selected vault.'
+        message = 'No backup policy specified for selected vault.'
         vmName = $vm.name
         vmId = $vm.id
         resourceGroup = $vm.resourceGroup
@@ -183,6 +299,29 @@ if ($vms) {
         environment = $environment
         vaultName = $vault.name
         vaultResourceGroup = $vault.resourceGroup
+      }
+      continue
+    }
+
+    $policy = az backup policy show `
+      --vault-name $vault.name `
+      --resource-group $vault.resourceGroup `
+      --name $policyName `
+      | ConvertFrom-Json
+
+    if (-not $policy) {
+      Write-Host "$($vm.name) => POLICY $policyName NOT FOUND IN VAULT $($vault.name)" -ForegroundColor Yellow
+      $planResult.notifications += [PSCustomObject]@{
+        level = 'Warning'
+        message = "Backup policy '$policyName' not found in selected vault."
+        vmName = $vm.name
+        vmId = $vm.id
+        resourceGroup = $vm.resourceGroup
+        owner = $owner
+        environment = $environment
+        vaultName = $vault.name
+        vaultResourceGroup = $vault.resourceGroup
+        policyName = $policyName
       }
       continue
     }
@@ -198,7 +337,8 @@ if ($vms) {
       vaultName = $vault.name
       vaultRG = $vault.resourceGroup
       vaultLocation = $vault.location
-      policyName = $policy.name
+      policyName = $policyName
+      ownerNotification = "Notify owner '$owner' about backup enablement."
       decision = $decision
     }
   }
@@ -209,6 +349,55 @@ if (-not (Test-Path $outputDir)) {
   New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 }
 
-$planResult | ConvertTo-Json -Depth 6 | Out-File -Encoding utf8 "$outputDir/remediation.json"
-Write-Host "Plan written to $outputDir/remediation.json"
+$jsonPath = "$outputDir/remediation.json"
+$planResult | ConvertTo-Json -Depth 6 | Out-File -Encoding utf8 $jsonPath
+Write-Host "Plan written to $jsonPath"
 Write-Host "Plan items: $($planResult.plan.Count); Notifications: $($planResult.notifications.Count)"
+
+$markdownPath = "$outputDir/remediation.md"
+$md = @()
+$md += "# Backup Remediation Plan"
+$md += ""
+$md += "Generated: $(Get-Date -Format 'u')"
+$md += ""
+$md += "## Summary"
+$md += "- Total plan items: $($planResult.plan.Count)"
+$md += "- Total notifications: $($planResult.notifications.Count)"
+$md += ""
+
+if ($planResult.plan.Count -gt 0) {
+  $md += "## Remediation Items"
+  foreach ($item in $planResult.plan | Select-Object -First 20) {
+    $md += "- **VM:** $($item.vmName)"
+    $md += "  - Resource Group: $($item.resourceGroup)"
+    $md += "  - Vault: $($item.vaultName) ($($item.vaultRG))"
+    $md += "  - Policy: $($item.policyName)"
+    $md += "  - Environment: $($item.environment)"
+    $md += "  - Owner: $($item.owner)"
+    $md += "  - Decision: $($item.decision)"
+    $md += ""
+  }
+  if ($planResult.plan.Count -gt 20) {
+    $md += "- And $($planResult.plan.Count - 20) more remediation items..."
+    $md += ""
+  }
+}
+
+if ($planResult.notifications.Count -gt 0) {
+  $md += "## Notifications"
+  foreach ($note in $planResult.notifications | Select-Object -First 20) {
+    $md += "- **$($note.level)**: $($note.message)"
+    if ($note.vmName) { $md += "  - VM: $($note.vmName)" }
+    if ($note.resourceGroup) { $md += "  - Resource Group: $($note.resourceGroup)" }
+    if ($note.owner) { $md += "  - Owner: $($note.owner)" }
+    if ($note.environment) { $md += "  - Environment: $($note.environment)" }
+    $md += ""
+  }
+  if ($planResult.notifications.Count -gt 20) {
+    $md += "- And $($planResult.notifications.Count - 20) more notifications..."
+    $md += ""
+  }
+}
+
+$md -join "`n" | Out-File -Encoding utf8 -FilePath $markdownPath
+Write-Host "Markdown plan written to $markdownPath"

@@ -7,8 +7,8 @@ on:
         description: 'Azure Subscription ID'
         required: true
       resourceGroupName:
-        description: 'Resource Group'
-        required: true
+        description: 'Resource Group (optional)'
+        required: false
 
 jobs:
   plan:

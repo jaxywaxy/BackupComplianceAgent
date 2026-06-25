@@ -7,6 +7,8 @@ if ([string]::IsNullOrWhiteSpace($SubscriptionId)) {
   throw "SubscriptionId is required."
 }
 
+$defaultNotificationRecipient = 'jacqui.rennie@slingshot.co.nz'
+
 function Get-TagValue($vm, $tagName) {
   if (-not $vm.tags) {
     return $null
@@ -205,6 +207,8 @@ if ($vms) {
     }
 
     if ($decision -ne 'Compliant') {
+      $notificationRecipient = $defaultNotificationRecipient
+      $ownerNotificationMessage = if ($decision -eq 'EnableBackup') { "Notify owner '$notificationRecipient' about backup enablement." } else { $null }
       $notification = [PSCustomObject]@{
         level = if ($decision -eq 'EnableBackup') { 'Alert' } else { 'Warning' }
         message = $reason
@@ -214,7 +218,8 @@ if ($vms) {
         owner = $owner
         environment = $environment
         decision = $decision
-        ownerNotification = if ($decision -eq 'EnableBackup') { "Notify owner '$owner' about backup enablement." } else { $null }
+        ownerNotification = $ownerNotificationMessage
+        notificationRecipient = $notificationRecipient
       }
       $report.notifications += $notification
     }

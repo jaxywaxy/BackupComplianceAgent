@@ -1,0 +1,18 @@
+{
+  "plan": [],
+  "notifications": [
+    {
+      "level": "Warning",
+      "message": "No virtual machines were discovered in subscription.",
+      "subscriptionId": "<your-subscription-id>",
+      "resourceGroup": "",
+      "notificationRecipient": "emil@slingshot.co.nz"
+    },
+    {
+      "level": "Error",
+      "message": "No Recovery Services vaults found in subscription.",
+      "subscriptionId": "<your-subscription-id>",
+      "notificationRecipient": "emil@slingshot.co.nz"
+    }
+  ]
+}

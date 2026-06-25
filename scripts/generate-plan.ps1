@@ -7,6 +7,8 @@ if ([string]::IsNullOrWhiteSpace($SubscriptionId)) {
   throw "SubscriptionId is required."
 }
 
+$defaultNotificationRecipient = 'jacqui.rennie@slingshot.co.nz'
+
 function Get-TagValue($vm, $tagName) {
   if (-not $vm.tags) {
     return $null
@@ -100,6 +102,32 @@ function Get-PreferredVault($vm, $subscriptionId, $vaults) {
   return $preferred
 }
 
+function Get-VaultPolicy($vault, $policyName) {
+  try {
+    return az backup policy show `
+      --vault-name $vault.name `
+      --resource-group $vault.resourceGroup `
+      --name $policyName `
+      2>$null | ConvertFrom-Json
+  } catch {
+    return $null
+  }
+}
+
+function Get-AnyVaultPolicy($vault) {
+  try {
+    $policies = az backup policy list `
+      --vault-name $vault.name `
+      --resource-group $vault.resourceGroup `
+      2>$null | ConvertFrom-Json
+    if ($policies -and $policies.Count -gt 0) {
+      return $policies[0]
+    }
+  } catch {
+  }
+  return $null
+}
+
 function Get-PolicyName($normalizedEnvironment, $vault) {
   $rule = Get-BackupRuleOrDefault $backupRules $normalizedEnvironment
   if ($rule -and $rule.policy -and $rule.policy -ne 'default') {
@@ -112,6 +140,18 @@ function Get-PolicyName($normalizedEnvironment, $vault) {
 
   if ($mapping -and $mapping.default_policy) {
     return $mapping.default_policy
+  }
+
+  if ($rule -and $rule.policy -eq 'default') {
+    $candidatePolicyName = 'DefaultPolicy'
+    if (Get-VaultPolicy $vault $candidatePolicyName) {
+      return $candidatePolicyName
+    }
+
+    $anyPolicy = Get-AnyVaultPolicy $vault
+    if ($anyPolicy -and $anyPolicy.name) {
+      return $anyPolicy.name
+    }
   }
 
   return $null
@@ -172,6 +212,7 @@ if (-not $vms) {
     message = 'No virtual machines were discovered in subscription.'
     subscriptionId = $SubscriptionId
     resourceGroup = $ResourceGroupName
+    notificationRecipient = $defaultNotificationRecipient
   }
 }
 
@@ -182,6 +223,7 @@ if (-not $vaults) {
     level = 'Error'
     message = 'No Recovery Services vaults found in subscription.'
     subscriptionId = $SubscriptionId
+    notificationRecipient = $defaultNotificationRecipient
   }
 }
 
@@ -222,6 +264,7 @@ if ($vms) {
         vmName = $vm.name
         vmId = $vm.id
         resourceGroup = $vm.resourceGroup
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
@@ -235,6 +278,7 @@ if ($vms) {
         vmId = $vm.id
         resourceGroup = $vm.resourceGroup
         owner = $owner
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
@@ -253,6 +297,7 @@ if ($vms) {
         owner = $owner
         environment = $environment
         decision = $decision
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
@@ -267,6 +312,7 @@ if ($vms) {
         resourceGroup = $vm.resourceGroup
         owner = $owner
         environment = $environment
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
@@ -282,6 +328,7 @@ if ($vms) {
         resourceGroup = $vm.resourceGroup
         owner = $owner
         environment = $environment
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
@@ -299,15 +346,19 @@ if ($vms) {
         environment = $environment
         vaultName = $vault.name
         vaultResourceGroup = $vault.resourceGroup
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
 
-    $policy = az backup policy show `
-      --vault-name $vault.name `
-      --resource-group $vault.resourceGroup `
-      --name $policyName `
-      | ConvertFrom-Json
+    $policy = Get-VaultPolicy $vault $policyName
+    if (-not $policy) {
+      Write-Host "$($vm.name) => POLICY $policyName NOT FOUND IN VAULT $($vault.name); falling back to first available policy" -ForegroundColor Yellow
+      $policy = Get-AnyVaultPolicy $vault
+      if ($policy -and $policy.name) {
+        $policyName = $policy.name
+      }
+    }
 
     if (-not $policy) {
       Write-Host "$($vm.name) => POLICY $policyName NOT FOUND IN VAULT $($vault.name)" -ForegroundColor Yellow
@@ -322,11 +373,14 @@ if ($vms) {
         vaultName = $vault.name
         vaultResourceGroup = $vault.resourceGroup
         policyName = $policyName
+        notificationRecipient = $defaultNotificationRecipient
       }
       continue
     }
 
     Write-Host "$($vm.name) => REMEDIATION PLAN GENERATED" -ForegroundColor Red
+    $recipient = $defaultNotificationRecipient
+
     $planResult.plan += [PSCustomObject]@{
       vmName = $vm.name
       vmId = $vm.id
@@ -338,7 +392,8 @@ if ($vms) {
       vaultRG = $vault.resourceGroup
       vaultLocation = $vault.location
       policyName = $policyName
-      ownerNotification = "Notify owner '$owner' about backup enablement."
+      ownerNotification = "Notify owner '$recipient' about backup enablement."
+      notificationRecipient = $recipient
       decision = $decision
     }
   }

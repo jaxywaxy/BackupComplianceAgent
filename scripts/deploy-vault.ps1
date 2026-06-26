@@ -69,3 +69,23 @@ while ($attempt -lt $maxAttempts) {
 if ($attempt -eq $maxAttempts) {
   Write-Host "Warning: Vault may not be fully ready yet. Proceeding anyway." -ForegroundColor Yellow
 }
+
+# Create default backup policies for the vault
+Write-Host ""
+Write-Host "Creating backup policies..." -ForegroundColor Cyan
+
+$policyScript = './scripts/create-vault-policies.ps1'
+if (Test-Path $policyScript) {
+  try {
+    & $policyScript -SubscriptionId $SubscriptionId -VaultName $VaultName -VaultRG $ResourceGroupName
+  } catch {
+    Write-Host "⚠️  Warning: Failed to create policies automatically: $_" -ForegroundColor Yellow
+    Write-Host "Policies can be created manually by running:" -ForegroundColor Yellow
+    Write-Host "  pwsh ./scripts/create-vault-policies.ps1 -SubscriptionId '$SubscriptionId' -VaultName '$VaultName' -VaultRG '$ResourceGroupName'" -ForegroundColor Yellow
+  }
+} else {
+  Write-Host "⚠️  Policy creation script not found at $policyScript" -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "✓ Vault deployment complete" -ForegroundColor Green

@@ -34,16 +34,39 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.SUBSCRIPTION_ID }}
 
-      - name: Check for remediation plan
+      - name: Verify configuration
         shell: pwsh
         run: |
+          Write-Host "=== Workflow Configuration ===" -ForegroundColor Cyan
+
+          # Check environment variables
+          $subId = "${{ vars.SUBSCRIPTION_ID }}"
+          if ([string]::IsNullOrWhiteSpace($subId)) {
+            Write-Host "✗ SUBSCRIPTION_ID variable not set!" -ForegroundColor Red
+            Write-Host "Go to Settings > Secrets and variables > Variables"
+            Write-Host "Add SUBSCRIPTION_ID with your subscription ID"
+            exit 1
+          }
+          Write-Host "✓ SUBSCRIPTION_ID is set" -ForegroundColor Green
+
+          # Check for plan file
           $planFile = './output/plans/remediation.json'
           if (-not (Test-Path $planFile)) {
-            Write-Host "⚠️  No remediation plan found at $planFile"
+            Write-Host "✗ No remediation plan found at $planFile" -ForegroundColor Red
             Write-Host "Please run the 'Generate Remediation Plan' workflow first."
             exit 1
           }
-          Write-Host "✓ Remediation plan found"
+          Write-Host "✓ Remediation plan found" -ForegroundColor Green
+
+          # Show plan summary
+          $plan = Get-Content $planFile | ConvertFrom-Json
+          $vaultCount = if ($plan.vaultDeployments) { $plan.vaultDeployments.Count } else { 0 }
+          $vmCount = if ($plan.plan) { $plan.plan.Count } else { 0 }
+
+          Write-Host ""
+          Write-Host "Plan contains:"
+          Write-Host "  - Vault deployments: $vaultCount"
+          Write-Host "  - VM backup items: $vmCount"
 
       - name: Deploy missing vaults
         shell: pwsh

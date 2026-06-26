@@ -29,12 +29,22 @@ if ([string]::IsNullOrWhiteSpace($policyNameToUse)) {
   throw "Backup policy name could not be resolved for vault $VaultName."
 }
 
+Write-Host "Enabling backup with policy: $policyNameToUse"
+
+# Build the full resource ID for the VM
+$vmResourceId = "/subscriptions/$((az account show --query id -o tsv))/resourceGroups/$VmRG/providers/Microsoft.Compute/virtualMachines/$VmName"
+Write-Host "VM Resource ID: $vmResourceId"
+
+# Enable backup using the VM resource ID
 az backup protection enable-for-vm `
   --vault-name $VaultName `
   --resource-group $VaultRG `
-  --vm $VmName `
-  --vm-resource-group $VmRG `
+  --vm $vmResourceId `
   --policy-name $policyNameToUse
 
-Write-Host "Backup enabled with policy $policyNameToUse"
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to enable backup for VM: $VmName"
+}
+
+Write-Host "✓ Backup enabled with policy $policyNameToUse" -ForegroundColor Green
 

@@ -2,21 +2,6 @@
   "vaultDeployments": [],
   "plan": [
     {
-      "vmName": "vm-dev-002",
-      "vmId": "/subscriptions/594e0bd0-2a8d-4419-b281-87869c20fd03/resourceGroups/RG-DEV/providers/Microsoft.Compute/virtualMachines/vm-dev-002",
-      "resourceGroup": "RG-DEV",
-      "owner": "jacqui.rennie@slingshot.co.nz",
-      "environment": "dev",
-      "action": "EnableBackup",
-      "vaultName": "rsv-backup-aus-001",
-      "vaultRG": "rg-backup-shared",
-      "vaultLocation": "australiaeast",
-      "policyName": "HourlyLogBackup",
-      "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
-      "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
-      "decision": "EnableBackup"
-    },
-    {
       "vmName": "vm-prod-001",
       "vmId": "/subscriptions/594e0bd0-2a8d-4419-b281-87869c20fd03/resourceGroups/RG-PROD/providers/Microsoft.Compute/virtualMachines/vm-prod-001",
       "resourceGroup": "RG-PROD",
@@ -26,7 +11,7 @@
       "vaultName": "rsv-backup-aus-001",
       "vaultRG": "rg-backup-shared",
       "vaultLocation": "australiaeast",
-      "policyName": "HourlyLogBackup",
+      "policyName": "EnhancedPolicy",
       "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
       "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
       "decision": "EnableBackup"
@@ -41,7 +26,7 @@
       "vaultName": "rsv-backup-aus-001",
       "vaultRG": "rg-backup-shared",
       "vaultLocation": "australiaeast",
-      "policyName": "HourlyLogBackup",
+      "policyName": "EnhancedPolicy",
       "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
       "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
       "decision": "EnableBackup"

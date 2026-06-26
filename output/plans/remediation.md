@@ -1,25 +1,17 @@
 # Backup Remediation Plan
 
-Generated: 2026-06-26 13:20:28Z
+Generated: 2026-06-26 14:16:10Z
 
 ## Summary
 - Vault deployments required: 0
-- Total plan items: 3
+- Total plan items: 2
 - Total notifications: 1
 
 ## Remediation Items
-- **VM:** vm-dev-002
-  - Resource Group: RG-DEV
-  - Vault: rsv-backup-aus-001 (rg-backup-shared)
-  - Policy: HourlyLogBackup
-  - Environment: dev
-  - Owner: jacqui.rennie@slingshot.co.nz
-  - Decision: EnableBackup
-
 - **VM:** vm-prod-001
   - Resource Group: RG-PROD
   - Vault: rsv-backup-aus-001 (rg-backup-shared)
-  - Policy: HourlyLogBackup
+  - Policy: EnhancedPolicy
   - Environment: prod
   - Owner: jacqui.rennie@slingshot.co.nz
   - Decision: EnableBackup
@@ -27,7 +19,7 @@ Generated: 2026-06-26 13:20:28Z
 - **VM:** vm-prod-002
   - Resource Group: RG-PROD
   - Vault: rsv-backup-aus-001 (rg-backup-shared)
-  - Policy: HourlyLogBackup
+  - Policy: EnhancedPolicy
   - Environment: prod
   - Owner: jacqui.rennie@slingshot.co.nz
   - Decision: EnableBackup

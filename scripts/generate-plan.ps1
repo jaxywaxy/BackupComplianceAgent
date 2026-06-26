@@ -400,6 +400,8 @@ if ($vms) {
     }
 
     $policyName = Get-PolicyName $normalizedEnvironment $vault
+    Write-Host "DEBUG: VM=$($vm.name), Environment=$environment, Normalized=$normalizedEnvironment, Policy=$policyName" -ForegroundColor Gray
+
     if (-not $policyName) {
       Write-Host "$($vm.name) => NO BACKUP POLICY FOUND FOR VAULT $($vault.name)" -ForegroundColor Yellow
       $planResult.notifications += [PSCustomObject]@{

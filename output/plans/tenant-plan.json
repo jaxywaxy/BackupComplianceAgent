@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26 03:09:29Z",
+  "generatedAt": "2026-06-26 03:18:39Z",
   "tenantId": "55a83d22-291a-4602-a535-56be562e96ab",
   "subscriptionCount": 2,
   "subscriptions": [
@@ -98,10 +98,10 @@
     }
   ],
   "summary": {
-    "notificationsCount": 2,
     "vaultDeploymentsNeeded": 1,
-    "compliantVMs": 0,
     "totalVMs": 0,
-    "nonCompliantVMs": 3
+    "nonCompliantVMs": 3,
+    "notificationsCount": 2,
+    "compliantVMs": 0
   }
 }

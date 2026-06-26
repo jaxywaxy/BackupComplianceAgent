@@ -1,7 +1,7 @@
 backup_rules:
   default:
     required: true
-    policy: default
+    policy: daily-14d
 
   prod:
     required: true
@@ -10,3 +10,4 @@ backup_rules:
   nonprod:
     required: true
     policy: daily-14d
+

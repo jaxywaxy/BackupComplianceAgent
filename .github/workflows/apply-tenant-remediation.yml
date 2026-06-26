@@ -1,0 +1,145 @@
+name: Apply Tenant Remediation
+
+on:
+  workflow_run:
+    workflows: ["Tenant Compliance Scan"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run without applying changes (preview mode)'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      auto-apply:
+        description: 'Auto-apply remediation to all subscriptions'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell dependencies
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -Name powershell-yaml -ListAvailable)) {
+            Install-Module -Name powershell-yaml -Force -Scope CurrentUser
+          }
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Download tenant plan artifacts
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: tenant-compliance-report
+          path: output/plans/
+
+      - name: Check tenant plan exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path './output/plans/tenant-plan.json')) {
+            Write-Host "⚠️  No tenant plan found" -ForegroundColor Yellow
+            Write-Host "Run 'Tenant Compliance Scan' workflow first" -ForegroundColor Yellow
+            exit 0
+          }
+          Write-Host "✓ Tenant plan found" -ForegroundColor Green
+
+      - name: Apply remediation (dry-run)
+        if: github.event.inputs.dry-run == 'true' || github.event_name == 'workflow_run'
+        shell: pwsh
+        run: |
+          ./scripts/apply-tenant-remediation.ps1 `
+            -TenantPlanFile './output/plans/tenant-plan.json' `
+            -DryRun
+
+      - name: Apply remediation (auto-apply)
+        if: github.event.inputs.auto-apply == 'true' && github.event.inputs.dry-run == 'false'
+        shell: pwsh
+        run: |
+          ./scripts/apply-tenant-remediation.ps1 `
+            -TenantPlanFile './output/plans/tenant-plan.json' `
+            -AutoApply
+
+      - name: Commit remediation results
+        if: github.event.inputs.auto-apply == 'true' && github.event.inputs.dry-run == 'false'
+        shell: pwsh
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output/plans/remediation-results.json
+          git commit -m "Applied tenant-level backup remediation" || echo "No changes to commit"
+          git push origin HEAD || echo "No new commits to push"
+
+      - name: Publish remediation summary
+        if: always()
+        shell: pwsh
+        run: |
+          $resultsFile = './output/plans/remediation-results.json'
+          if (Test-Path $resultsFile) {
+            $results = Get-Content $resultsFile | ConvertFrom-Json
+
+            $summary = @()
+            $summary += "# Tenant Remediation Results"
+            $summary += ""
+            $summary += "## Summary"
+            $summary += "- ✓ Successful: $($results.successful.Count)"
+            $summary += "- ✗ Failed: $($results.failed.Count)"
+            $summary += "- ⊘ Skipped: $($results.skipped.Count)"
+            $summary += ""
+
+            if ($results.successful.Count -gt 0) {
+              $summary += "## Successfully Remediated"
+              $summary += ""
+              foreach ($sub in $results.successful) {
+                $summary += "- **$($sub.subscription)** (Status: $($sub.status))"
+                $summary += "  - Vaults deployed: $($sub.vaults)"
+                $summary += "  - VMs protected: $($sub.vms)"
+                $summary += ""
+              }
+            }
+
+            if ($results.failed.Count -gt 0) {
+              $summary += "## Failed Subscriptions"
+              $summary += ""
+              foreach ($sub in $results.failed) {
+                $summary += "- **$($sub.subscription)**: $($sub.reason)"
+                $summary += ""
+              }
+            }
+
+            $summaryFile = $env:GITHUB_STEP_SUMMARY
+            if ($summaryFile) {
+              $summary -join "`n" | Out-File -Encoding utf8 -FilePath $summaryFile -Append
+            }
+          }
+
+      - name: Upload remediation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remediation-results
+          path: output/plans/remediation-results.json
+          retention-days: 30

@@ -177,7 +177,20 @@ function Get-PolicyName($normalizedEnvironment, $vault) {
 
     $anyPolicy = Get-AnyVaultPolicy $vault
     if ($anyPolicy -and $anyPolicy.name) {
+      Write-Host "⚠️  Warning: Using fallback policy '$($anyPolicy.name)' because policy '$policyName' was not found" -ForegroundColor Yellow
       return $anyPolicy.name
+    }
+  }
+
+  # If we have a specific policy name requested but couldn't find it, log it
+  if ($rule -and $policyName -and $policyName -ne 'default') {
+    $existingPolicy = Get-VaultPolicy $vault $policyName
+    if (-not $existingPolicy) {
+      Write-Host "⚠️  Warning: Requested policy '$policyName' not found in vault. Available policies:" -ForegroundColor Yellow
+      $allPolicies = Get-AnyVaultPolicy $vault
+      if ($allPolicies) {
+        Write-Host "    - $($allPolicies.name)" -ForegroundColor Yellow
+      }
     }
   }
 

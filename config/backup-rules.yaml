@@ -1,13 +1,13 @@
 backup_rules:
   default:
     required: true
-    policy: daily-14d
+    policy: DefaultPolicy
 
   prod:
     required: true
-    policy: daily-35d
+    policy: EnhancedPolicy
 
   nonprod:
     required: true
-    policy: daily-14d
+    policy: DefaultPolicy
 

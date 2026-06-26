@@ -9,6 +9,7 @@ if ([string]::IsNullOrWhiteSpace($SubscriptionId) -or [string]::IsNullOrWhiteSpa
 }
 
 Write-Host "Creating backup policies for vault: $VaultName" -ForegroundColor Cyan
+Write-Host ""
 
 # Define policies to create
 $policies = @(
@@ -24,76 +25,47 @@ $policies = @(
   }
 )
 
-# Get the module context
-if (-not (Get-Module -Name Az.RecoveryServices -ListAvailable)) {
-  Write-Host "Installing Az.RecoveryServices module..." -ForegroundColor Yellow
-  Install-Module -Name Az.RecoveryServices -Force -AllowClobber -Scope CurrentUser
-}
-
-Import-Module Az.RecoveryServices -Force
-
-# Set context to subscription
-Select-AzSubscription -SubscriptionId $SubscriptionId | Out-Null
-
-# Get vault
-Write-Host "Loading vault: $VaultName" -ForegroundColor Cyan
-$vault = Get-AzRecoveryServicesVault -Name $VaultName -ResourceGroupName $VaultRG
+# Check if vault exists
+Write-Host "Checking vault: $VaultName"
+$vault = az backup vault list `
+  --subscription $SubscriptionId `
+  --resource-group $VaultRG `
+  --output json 2>$null | ConvertFrom-Json | Where-Object { $_.name -eq $VaultName }
 
 if (-not $vault) {
   throw "Vault not found: $VaultName in resource group $VaultRG"
 }
 
-Set-AzRecoveryServicesVaultContext -Vault $vault
+Write-Host "✓ Vault found" -ForegroundColor Green
+Write-Host ""
 
-# Create policies
-foreach ($policyDef in $policies) {
-  $policyName = $policyDef.name
-  $retentionDays = $policyDef.retention
+# List existing policies
+Write-Host "Current policies in vault:" -ForegroundColor Cyan
+$existingPolicies = az backup policy list `
+  --vault-name $VaultName `
+  --resource-group $VaultRG `
+  --output json 2>$null | ConvertFrom-Json
 
-  Write-Host ""
-  Write-Host "Policy: $policyName ($retentionDays days retention)" -ForegroundColor Yellow
-
-  # Check if policy exists
-  try {
-    $existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy -Name $policyName -ErrorAction SilentlyContinue
-    if ($existingPolicy) {
-      Write-Host "  ✓ Policy already exists" -ForegroundColor Green
-      continue
-    }
-  } catch {
-    # Policy doesn't exist, continue to create it
-  }
-
-  try {
-    # Get default schedule policy
-    $schedulePolicy = New-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM -BackupManagementType AzureVM -BackupFrequency Daily -BackupTime 02:00
-
-    # Get default retention policy
-    $retentionPolicy = New-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM `
-      -BackupManagementType AzureVM `
-      -RetentionDurationType Days `
-      -RetentionCount $retentionDays
-
-    # Create the policy
-    New-AzRecoveryServicesBackupProtectionPolicy `
-      -Name $policyName `
-      -WorkloadType AzureVM `
-      -BackupManagementType AzureVM `
-      -RetentionPolicy $retentionPolicy `
-      -SchedulePolicy $schedulePolicy `
-      -VaultId $vault.ID | Out-Null
-
-    Write-Host "  ✓ Policy created successfully" -ForegroundColor Green
-  } catch {
-    Write-Host "  ✗ Failed to create policy: $_" -ForegroundColor Red
-    throw
-  }
+foreach ($policy in $existingPolicies) {
+  Write-Host "  - $($policy.name)" -ForegroundColor Yellow
 }
 
 Write-Host ""
-Write-Host "✓ All policies created successfully" -ForegroundColor Green
+Write-Host "Note: Backup policies must be created manually in Azure Portal or via Azure PowerShell" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Use these policy names in your backup-rules.yaml:" -ForegroundColor Cyan
-foreach ($policy in $policies) {
-  Write-Host "  - $($policy.name)" -ForegroundColor Cyan
-}
+Write-Host "To create policies using Azure PowerShell, run:" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  Connect-AzAccount" -ForegroundColor Gray
+Write-Host "  Select-AzSubscription -SubscriptionId '$SubscriptionId'" -ForegroundColor Gray
+Write-Host "  `$vault = Get-AzRecoveryServicesVault -Name '$VaultName' -ResourceGroupName '$VaultRG'" -ForegroundColor Gray
+Write-Host "  Set-AzRecoveryServicesVaultContext -Vault `$vault" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  # Create daily-14d policy" -ForegroundColor Gray
+Write-Host "  `$schedule = New-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM -BackupFrequency Daily -BackupTime 02:00" -ForegroundColor Gray
+Write-Host "  `$retention = New-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM -RetentionDurationType Days -RetentionCount 14" -ForegroundColor Gray
+Write-Host "  New-AzRecoveryServicesBackupProtectionPolicy -Name 'daily-14d' -WorkloadType AzureVM -RetentionPolicy `$retention -SchedulePolicy `$schedule" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  # Create daily-35d policy" -ForegroundColor Gray
+Write-Host "  `$schedule = New-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM -BackupFrequency Daily -BackupTime 02:00" -ForegroundColor Gray
+Write-Host "  `$retention = New-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM -RetentionDurationType Days -RetentionCount 35" -ForegroundColor Gray
+Write-Host "  New-AzRecoveryServicesBackupProtectionPolicy -Name 'daily-35d' -WorkloadType AzureVM -RetentionPolicy `$retention -SchedulePolicy `$schedule" -ForegroundColor Gray

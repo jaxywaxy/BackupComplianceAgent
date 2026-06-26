@@ -70,22 +70,23 @@ if ($attempt -eq $maxAttempts) {
   Write-Host "Warning: Vault may not be fully ready yet. Proceeding anyway." -ForegroundColor Yellow
 }
 
-# Create default backup policies for the vault
+# Create default backup policies for the vault using REST API
 Write-Host ""
 Write-Host "Creating backup policies..." -ForegroundColor Cyan
 
-$policyScript = './scripts/create-vault-policies.ps1'
+$policyScript = './scripts/create-backup-policies-rest.ps1'
 if (Test-Path $policyScript) {
   try {
     & $policyScript -SubscriptionId $SubscriptionId -VaultName $VaultName -VaultRG $ResourceGroupName
+    Write-Host "✓ Policies created successfully" -ForegroundColor Green
   } catch {
-    Write-Host "⚠️  Warning: Failed to create policies automatically: $_" -ForegroundColor Yellow
+    Write-Host "⚠️  Warning: Failed to create policies: $_" -ForegroundColor Yellow
     Write-Host "Policies can be created manually by running:" -ForegroundColor Yellow
-    Write-Host "  pwsh ./scripts/create-vault-policies.ps1 -SubscriptionId '$SubscriptionId' -VaultName '$VaultName' -VaultRG '$ResourceGroupName'" -ForegroundColor Yellow
+    Write-Host "  pwsh ./scripts/create-backup-policies-rest.ps1 -SubscriptionId '$SubscriptionId' -VaultName '$VaultName' -VaultRG '$ResourceGroupName'" -ForegroundColor Yellow
   }
 } else {
   Write-Host "⚠️  Policy creation script not found at $policyScript" -ForegroundColor Yellow
 }
 
 Write-Host ""
-Write-Host "✓ Vault deployment complete" -ForegroundColor Green
+Write-Host "✓ Vault deployment and policy setup complete" -ForegroundColor Green

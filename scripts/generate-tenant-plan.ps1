@@ -59,10 +59,15 @@ foreach ($subId in $subscriptionsToScan) {
     # Generate plan for this subscription
     $planOutput = & "./scripts/generate-plan.ps1" -SubscriptionId $subId 2>&1 | Out-String
 
-    # Read the generated JSON
+    # Read the generated JSON (save to subscription-specific file)
     $subPlanFile = "$OutputDir/remediation.json"
+    $subPlanFileBackup = "$OutputDir/remediation-$($subId).json"
+
     if (Test-Path $subPlanFile) {
       $subPlan = Get-Content $subPlanFile | ConvertFrom-Json
+
+      # Also save a subscription-specific copy for reference
+      Copy-Item $subPlanFile $subPlanFileBackup -Force
 
       # Count VMs
       $vaultCount = if ($subPlan.vaultDeployments) { $subPlan.vaultDeployments.Count } else { 0 }

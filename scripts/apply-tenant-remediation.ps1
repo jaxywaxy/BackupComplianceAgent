@@ -43,26 +43,34 @@ foreach ($subResult in $tenantPlan.subscriptions) {
     continue
   }
 
-  # Generate subscription-level remediation plan
-  Write-Host "  Generating subscription remediation plan..." -ForegroundColor Yellow
+  # Check for subscription-specific plan first
+  Write-Host "  Looking for remediation plan..." -ForegroundColor Yellow
 
   try {
-    # Generate plan for this subscription
-    & "./scripts/generate-plan.ps1" -SubscriptionId $subId 2>&1 | Out-Null
+    # Try to use subscription-specific plan (from tenant scan)
+    $subPlanFile = "./output/plans/remediation-$subId.json"
 
-    # Read the generated plan
-    $planFile = "./output/plans/remediation.json"
-    if (-not (Test-Path $planFile)) {
-      Write-Host "  ✗ Failed to generate plan" -ForegroundColor Red
-      $remediationResults.failed += @{
-        subscription = $subName
-        reason = "Plan generation failed"
+    if (Test-Path $subPlanFile) {
+      Write-Host "  ✓ Found subscription plan" -ForegroundColor Green
+      $plan = Get-Content $subPlanFile | ConvertFrom-Json
+    } else {
+      # Fall back to generating one
+      Write-Host "  Generating subscription remediation plan..." -ForegroundColor Yellow
+      & "./scripts/generate-plan.ps1" -SubscriptionId $subId 2>&1 | Out-Null
+
+      $planFile = "./output/plans/remediation.json"
+      if (-not (Test-Path $planFile)) {
+        Write-Host "  ✗ Failed to generate plan" -ForegroundColor Red
+        $remediationResults.failed += @{
+          subscription = $subName
+          reason = "Plan generation failed"
+        }
+        Write-Host ""
+        continue
       }
-      Write-Host ""
-      continue
-    }
 
-    $plan = Get-Content $planFile | ConvertFrom-Json
+      $plan = Get-Content $planFile | ConvertFrom-Json
+    }
 
     $vaultCount = if ($plan.vaultDeployments) { $plan.vaultDeployments.Count } else { 0 }
     $planItemCount = if ($plan.plan) { $plan.plan.Count } else { 0 }

@@ -1,0 +1,107 @@
+{
+  "generatedAt": "2026-06-26 03:09:29Z",
+  "tenantId": "55a83d22-291a-4602-a535-56be562e96ab",
+  "subscriptionCount": 2,
+  "subscriptions": [
+    {
+      "subscriptionId": "57aa2cb5-1f26-4f7c-ae52-918da1394d09",
+      "subscriptionName": "sub-az-landingzone",
+      "vaultDeploymentsCount": 0,
+      "vmsNeedingBackupCount": 0,
+      "notificationsCount": 1,
+      "plan": [],
+      "vaultDeploymentDetails": [],
+      "notificationDetails": [
+        {
+          "level": "Warning",
+          "message": "Missing owner tag.",
+          "vmName": "jaxywaxyvm156",
+          "vmId": "/subscriptions/57aa2cb5-1f26-4f7c-ae52-918da1394d09/resourceGroups/RG-VM-TEST/providers/Microsoft.Compute/virtualMachines/jaxywaxyvm156",
+          "resourceGroup": "RG-VM-TEST",
+          "notificationRecipient": "jacqui.rennie@slingshot.co.nz"
+        }
+      ]
+    },
+    {
+      "subscriptionId": "594e0bd0-2a8d-4419-b281-87869c20fd03",
+      "subscriptionName": "sub-lz-bicep",
+      "vaultDeploymentsCount": 1,
+      "vmsNeedingBackupCount": 3,
+      "notificationsCount": 1,
+      "plan": [
+        {
+          "vmName": "vm-dev-002",
+          "vmId": "/subscriptions/594e0bd0-2a8d-4419-b281-87869c20fd03/resourceGroups/RG-DEV/providers/Microsoft.Compute/virtualMachines/vm-dev-002",
+          "resourceGroup": "RG-DEV",
+          "owner": "jacqui.rennie@slingshot.co.nz",
+          "environment": "dev",
+          "action": "EnableBackup",
+          "vaultName": "rsv-backup-aus-001",
+          "vaultRG": "rg-backup-shared",
+          "vaultLocation": "australiaeast",
+          "policyName": null,
+          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
+          "decision": "EnableBackup"
+        },
+        {
+          "vmName": "vm-prod-001",
+          "vmId": "/subscriptions/594e0bd0-2a8d-4419-b281-87869c20fd03/resourceGroups/RG-PROD/providers/Microsoft.Compute/virtualMachines/vm-prod-001",
+          "resourceGroup": "RG-PROD",
+          "owner": "jacqui.rennie@slingshot.co.nz",
+          "environment": "prod",
+          "action": "EnableBackup",
+          "vaultName": "rsv-backup-aus-001",
+          "vaultRG": "rg-backup-shared",
+          "vaultLocation": "australiaeast",
+          "policyName": null,
+          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
+          "decision": "EnableBackup"
+        },
+        {
+          "vmName": "vm-prod-002",
+          "vmId": "/subscriptions/594e0bd0-2a8d-4419-b281-87869c20fd03/resourceGroups/RG-PROD/providers/Microsoft.Compute/virtualMachines/vm-prod-002",
+          "resourceGroup": "RG-PROD",
+          "owner": "jacqui.rennie@slingshot.co.nz",
+          "environment": "prod",
+          "action": "EnableBackup",
+          "vaultName": "rsv-backup-aus-001",
+          "vaultRG": "rg-backup-shared",
+          "vaultLocation": "australiaeast",
+          "policyName": null,
+          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
+          "decision": "EnableBackup"
+        }
+      ],
+      "vaultDeploymentDetails": [
+        {
+          "deploymentKey": "rsv-backup-aus-001-rg-backup-shared",
+          "vaultName": "rsv-backup-aus-001",
+          "vaultRG": "rg-backup-shared",
+          "location": "australiaeast",
+          "vmName": "vm-dev-002",
+          "subscriptionId": "594e0bd0-2a8d-4419-b281-87869c20fd03"
+        }
+      ],
+      "notificationDetails": [
+        {
+          "level": "Warning",
+          "message": "Missing owner tag.",
+          "vmName": "vm-dev-001",
+          "vmId": "/subscriptions/594e0bd0-2a8d-4419-b281-87869c20fd03/resourceGroups/RG-DEV/providers/Microsoft.Compute/virtualMachines/vm-dev-001",
+          "resourceGroup": "RG-DEV",
+          "notificationRecipient": "jacqui.rennie@slingshot.co.nz"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "notificationsCount": 2,
+    "vaultDeploymentsNeeded": 1,
+    "compliantVMs": 0,
+    "totalVMs": 0,
+    "nonCompliantVMs": 3
+  }
+}

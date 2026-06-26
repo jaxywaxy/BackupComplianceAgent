@@ -1,14 +1,5 @@
 {
-  "vaultDeployments": [
-    {
-      "deploymentKey": "rsv-backup-aus-001-rg-backup-shared",
-      "vaultName": "rsv-backup-aus-001",
-      "vaultRG": "rg-backup-shared",
-      "location": "australiaeast",
-      "vmName": "vm-dev-002",
-      "subscriptionId": "594e0bd0-2a8d-4419-b281-87869c20fd03"
-    }
-  ],
+  "vaultDeployments": [],
   "plan": [
     {
       "vmName": "vm-dev-002",
@@ -20,8 +11,8 @@
       "vaultName": "rsv-backup-aus-001",
       "vaultRG": "rg-backup-shared",
       "vaultLocation": "australiaeast",
-      "policyName": null,
-      "ownerNotification": "Vault deployment required before backup can be enabled.",
+      "policyName": "HourlyLogBackup",
+      "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
       "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
       "decision": "EnableBackup"
     },
@@ -35,8 +26,8 @@
       "vaultName": "rsv-backup-aus-001",
       "vaultRG": "rg-backup-shared",
       "vaultLocation": "australiaeast",
-      "policyName": null,
-      "ownerNotification": "Vault deployment required before backup can be enabled.",
+      "policyName": "HourlyLogBackup",
+      "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
       "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
       "decision": "EnableBackup"
     },
@@ -50,8 +41,8 @@
       "vaultName": "rsv-backup-aus-001",
       "vaultRG": "rg-backup-shared",
       "vaultLocation": "australiaeast",
-      "policyName": null,
-      "ownerNotification": "Vault deployment required before backup can be enabled.",
+      "policyName": "HourlyLogBackup",
+      "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
       "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
       "decision": "EnableBackup"
     }

@@ -78,12 +78,12 @@ foreach ($subId in $subscriptionsToScan) {
       $subResult = [PSCustomObject]@{
         subscriptionId = $subId
         subscriptionName = $subInfo.name
-        vaultDeployments = $vaultCount
-        vmsNeedingBackup = $planCount
-        notifications = $notifCount
+        vaultDeploymentsCount = $vaultCount
+        vmsNeedingBackupCount = $planCount
+        notificationsCount = $notifCount
         plan = $subPlan.plan
-        vaultDeployments = $subPlan.vaultDeployments
-        notifications = $subPlan.notifications
+        vaultDeploymentDetails = $subPlan.vaultDeployments
+        notificationDetails = $subPlan.notifications
       }
 
       $tenantPlan.subscriptions += $subResult

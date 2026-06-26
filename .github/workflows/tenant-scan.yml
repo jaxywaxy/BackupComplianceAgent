@@ -1,0 +1,135 @@
+name: Tenant Compliance Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly (Sundays 2 AM UTC)
+  workflow_dispatch:
+    inputs:
+      scan-type:
+        description: 'Scan all subscriptions or specific ones'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - specific
+      subscription-ids:
+        description: 'Comma-separated subscription IDs (only if scan-type=specific)'
+        required: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell dependencies
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -Name powershell-yaml -ListAvailable)) {
+            Install-Module -Name powershell-yaml -Force -Scope CurrentUser
+          }
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Discover subscriptions
+        shell: pwsh
+        run: |
+          Write-Host "=== Discovering Subscriptions ===" -ForegroundColor Cyan
+          ./scripts/get-all-subscriptions.ps1 -IncludeDetails
+
+      - name: Generate tenant plan (all subscriptions)
+        if: github.event.inputs.scan-type == 'all' || github.event_name == 'schedule'
+        shell: pwsh
+        run: |
+          ./scripts/generate-tenant-plan.ps1 -AllSubscriptions
+
+      - name: Generate tenant plan (specific subscriptions)
+        if: github.event.inputs.scan-type == 'specific'
+        shell: pwsh
+        run: |
+          $subIds = "${{ github.event.inputs.subscription-ids }}".Split(',') | ForEach-Object { $_.Trim() }
+          ./scripts/generate-tenant-plan.ps1 -SubscriptionIds $subIds
+
+      - name: Check tenant plan
+        id: check_plan
+        shell: pwsh
+        run: |
+          $planFile = './output/plans/tenant-plan.json'
+          if (-not (Test-Path $planFile)) {
+            Write-Host "No tenant plan generated"
+            exit 0
+          }
+
+          $plan = Get-Content $planFile | ConvertFrom-Json
+          $vaultCount = $plan.summary.vaultDeploymentsNeeded
+          $vmCount = $plan.summary.nonCompliantVMs
+          $notifCount = $plan.summary.notificationsCount
+
+          Write-Host "Tenant Plan Summary:"
+          Write-Host "  Subscriptions: $($plan.subscriptionCount)"
+          Write-Host "  Non-Compliant VMs: $vmCount"
+          Write-Host "  Vault Deployments: $vaultCount"
+          Write-Host "  Notifications: $notifCount"
+
+          echo "vmCount=$vmCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
+          echo "vaultCount=$vaultCount" | Out-File -Encoding utf8 -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Commit tenant plan
+        if: steps.check_plan.outputs.vmCount != '0'
+        shell: pwsh
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output/plans/tenant-plan.json output/plans/tenant-summary.md
+          git commit -m "Generated tenant-level compliance plan" || echo "No changes to commit"
+          git push origin HEAD || echo "No new commits to push"
+
+      - name: Publish tenant summary
+        if: always()
+        shell: pwsh
+        run: |
+          $summaryFile = './output/plans/tenant-summary.md'
+          if (Test-Path $summaryFile) {
+            $content = Get-Content $summaryFile -Raw
+            $summaryOutput = $env:GITHUB_STEP_SUMMARY
+            if ($summaryOutput) {
+              Add-Content -Path $summaryOutput -Value $content
+            } else {
+              Write-Host $content
+            }
+          }
+
+      - name: Create tenant scan report artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: tenant-compliance-report
+          path: output/plans/tenant-*.json
+          retention-days: 30
+
+  next-steps:
+    needs: scan
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Report results
+        run: |
+          echo "## Tenant Scan Complete"
+          echo ""
+          echo "Check the artifacts for detailed reports:"
+          echo "- tenant-plan.json"
+          echo "- tenant-summary.md"
+          echo ""
+          echo "Next: Review results and create subscription-level remediation PRs"

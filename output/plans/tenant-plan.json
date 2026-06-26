@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-06-26 03:53:52Z",
+  "generatedAt": "2026-06-26 04:10:50Z",
   "tenantId": "55a83d22-291a-4602-a535-56be562e96ab",
   "subscriptionCount": 2,
   "subscriptions": [
     {
       "subscriptionId": "57aa2cb5-1f26-4f7c-ae52-918da1394d09",
       "subscriptionName": "sub-az-landingzone",
-      "vaultDeploymentsCount": 1,
+      "vaultDeploymentsCount": 0,
       "vmsNeedingBackupCount": 1,
       "notificationsCount": 0,
       "plan": [
@@ -20,28 +20,19 @@
           "vaultName": "rsv-backup-aus-001",
           "vaultRG": "rg-backup-shared",
           "vaultLocation": "australiaeast",
-          "policyName": null,
-          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "policyName": "EnhancedPolicy",
+          "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
           "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
           "decision": "EnableBackup"
         }
       ],
-      "vaultDeploymentDetails": [
-        {
-          "deploymentKey": "rsv-backup-aus-001-rg-backup-shared",
-          "vaultName": "rsv-backup-aus-001",
-          "vaultRG": "rg-backup-shared",
-          "location": "australiaeast",
-          "vmName": "jaxywaxyvm156",
-          "subscriptionId": "57aa2cb5-1f26-4f7c-ae52-918da1394d09"
-        }
-      ],
+      "vaultDeploymentDetails": [],
       "notificationDetails": []
     },
     {
       "subscriptionId": "594e0bd0-2a8d-4419-b281-87869c20fd03",
       "subscriptionName": "sub-lz-bicep",
-      "vaultDeploymentsCount": 1,
+      "vaultDeploymentsCount": 0,
       "vmsNeedingBackupCount": 3,
       "notificationsCount": 1,
       "plan": [
@@ -55,8 +46,8 @@
           "vaultName": "rsv-backup-aus-001",
           "vaultRG": "rg-backup-shared",
           "vaultLocation": "australiaeast",
-          "policyName": null,
-          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "policyName": "DefaultPolicy",
+          "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
           "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
           "decision": "EnableBackup"
         },
@@ -70,8 +61,8 @@
           "vaultName": "rsv-backup-aus-001",
           "vaultRG": "rg-backup-shared",
           "vaultLocation": "australiaeast",
-          "policyName": null,
-          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "policyName": "EnhancedPolicy",
+          "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
           "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
           "decision": "EnableBackup"
         },
@@ -85,22 +76,13 @@
           "vaultName": "rsv-backup-aus-001",
           "vaultRG": "rg-backup-shared",
           "vaultLocation": "australiaeast",
-          "policyName": null,
-          "ownerNotification": "Vault deployment required before backup can be enabled.",
+          "policyName": "EnhancedPolicy",
+          "ownerNotification": "Notify owner 'jacqui.rennie@slingshot.co.nz' about backup enablement.",
           "notificationRecipient": "jacqui.rennie@slingshot.co.nz",
           "decision": "EnableBackup"
         }
       ],
-      "vaultDeploymentDetails": [
-        {
-          "deploymentKey": "rsv-backup-aus-001-rg-backup-shared",
-          "vaultName": "rsv-backup-aus-001",
-          "vaultRG": "rg-backup-shared",
-          "location": "australiaeast",
-          "vmName": "vm-dev-002",
-          "subscriptionId": "594e0bd0-2a8d-4419-b281-87869c20fd03"
-        }
-      ],
+      "vaultDeploymentDetails": [],
       "notificationDetails": [
         {
           "level": "Warning",
@@ -114,10 +96,10 @@
     }
   ],
   "summary": {
-    "compliantVMs": 0,
     "totalVMs": 0,
+    "notificationsCount": 1,
+    "vaultDeploymentsNeeded": 0,
     "nonCompliantVMs": 4,
-    "vaultDeploymentsNeeded": 2,
-    "notificationsCount": 1
+    "compliantVMs": 0
   }
 }

@@ -1,6 +1,6 @@
 # Tenant-Level Backup Compliance Report
 
-**Generated:** 2026-06-26 03:54:02
+**Generated:** 2026-06-26 04:11:08
 
 ## Executive Summary
 
@@ -8,7 +8,7 @@
 |--------|-------|
 | Subscriptions Scanned | 2 |
 | Total Non-Compliant VMs | 4 |
-| Vault Deployments Needed | 2 |
+| Vault Deployments Needed | 0 |
 | Notifications | 1 |
 
 ## Subscription Details
@@ -28,7 +28,7 @@
 - **jaxywaxyvm156** (Owner: jacqui.rennie@slingshot.co.nz)
   - Environment: prod
   - Vault: rsv-backup-aus-001
-  - Policy: 
+  - Policy: EnhancedPolicy
 
 ---
 
@@ -47,17 +47,17 @@
 - **vm-dev-002** (Owner: jacqui.rennie@slingshot.co.nz)
   - Environment: dev
   - Vault: rsv-backup-aus-001
-  - Policy: 
+  - Policy: DefaultPolicy
 
 - **vm-prod-001** (Owner: jacqui.rennie@slingshot.co.nz)
   - Environment: prod
   - Vault: rsv-backup-aus-001
-  - Policy: 
+  - Policy: EnhancedPolicy
 
 - **vm-prod-002** (Owner: jacqui.rennie@slingshot.co.nz)
   - Environment: prod
   - Vault: rsv-backup-aus-001
-  - Policy: 
+  - Policy: EnhancedPolicy
 
 ---
 

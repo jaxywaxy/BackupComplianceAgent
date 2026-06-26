@@ -166,9 +166,12 @@ foreach ($result in $subscriptionResults) {
 
 $md += "## Next Steps"
 $md += ""
-$md += "1. Review the detailed plan in `tenant-plan.json`"
+$md += "1. Review the detailed plan in tenant-plan.json"
+$md += ""
 $md += "2. For each subscription, create a remediation PR"
+$md += ""
 $md += "3. Approve and merge PRs to apply remediation"
+$md += ""
 $md += "4. Monitor backup jobs in Azure Portal"
 $md += ""
 

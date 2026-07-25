@@ -1,8 +1,6 @@
 name: Tenant Compliance Scan
 
 on:
-  schedule:
-    - cron: '0 2 * * 0'  # Weekly (Sundays 2 AM UTC)
   workflow_dispatch:
     inputs:
       scan-type:
